@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Doro Music - 移动端设计</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#6366f1',
+                        secondary: '#8b5cf6',
+                        background: '#f8fafc',
+                        surface: '#ffffff',
+                        onPrimary: '#ffffff',
+                        onSecondary: '#ffffff',
+                        onBackground: '#1e293b',
+                        onSurface: '#1e293b',
+                        muted: '#64748b',
+                    },
+                    fontFamily: {
+                        inter: ['Inter', 'sans-serif'],
+                    },
+                },
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .app-container {
+                max-width: 414px;
+                margin: 0 auto;
+                min-height: 100vh;
+                background-color: #f8fafc;
+            }
+            .tab-active {
+                background-color: #e0e7ff;
+                color: #6366f1;
+            }
+            .tab-inactive {
+                color: #64748b;
+            }
+            .mini-player {
+                background-color: #f1f5f9;
+                border-top: 1px solid #e2e8f0;
+            }
+        }
+    </style>
+</head>
+<body class="font-inter bg-gray-200">
+    <div class="app-container">
+        <!-- 顶部应用栏 -->
+        <header class="bg-surface px-4 pt-12 pb-4">
+            <div class="flex items-center justify-between mb-4">
+                <h1 class="text-3xl font-bold text-onBackground">Doro Music</h1>
+                <div class="flex items-center space-x-4">
+                    <button class="text-muted hover:text-primary">
+                        <i class="fa fa-search text-xl"></i>
+                    </button>
+                    <button class="text-muted hover:text-primary">
+                        <i class="fa fa-refresh text-xl"></i>
+                    </button>
+                    <button class="text-muted hover:text-primary">
+                        <i class="fa fa-cog text-xl"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 分类标签页 -->
+            <div class="flex space-x-2">
+                <button class="tab-active px-4 py-2 rounded-full text-sm font-medium">歌曲</button>
+                <button class="tab-inactive px-4 py-2 rounded-full text-sm font-medium">艺术家</button>
+                <button class="tab-inactive px-4 py-2 rounded-full text-sm font-medium">文件夹</button>
+                <button class="tab-inactive px-4 py-2 rounded-full text-sm font-medium">歌单</button>
+            </div>
+        </header>
+
+        <!-- 主内容区域 -->
+        <main class="flex-1 px-4 py-4">
+            <!-- 歌曲列表 -->
+            <section id="songs" class="block">
+                <!-- 统计和操作栏 -->
+                <div class="flex items-center justify-between mb-4">
+                    <span class="text-sm text-muted">1 首歌曲</span>
+                    <div class="flex items-center space-x-3">
+                        <button class="text-primary">
+                            <i class="fa fa-play"></i>
+                        </button>
+                        <button class="text-muted">
+                            <i class="fa fa-random"></i>
+                        </button>
+                        <button class="text-muted">
+                            <i class="fa fa-filter"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 歌曲列表 -->
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between py-3">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center">
+                                <i class="fa fa-music text-gray-400"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-medium text-onBackground">秋天不回来</h3>
+                                <p class="text-sm text-muted">王强</p>
+                            </div>
+                        </div>
+                        <button class="text-muted p-2">
+                            <i class="fa fa-ellipsis-v"></i>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 艺术家列表 -->
+            <section id="artists" class="hidden">
+                <div class="flex items-center justify-between mb-4">
+                    <span class="text-sm text-muted">1 位艺术家</span>
+                    <button class="text-muted">
+                        <i class="fa fa-filter"></i>
+                    </button>
+                </div>
+
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between py-3">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center">
+                                <i class="fa fa-user text-gray-400"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-medium text-onBackground">王强</h3>
+                                <p class="text-sm text-muted">1 首歌曲</p>
+                            </div>
+                        </div>
+                        <button class="text-muted p-2">
+                            <i class="fa fa-ellipsis-v"></i>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 文件夹列表 -->
+            <section id="folders" class="hidden">
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between py-3">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center">
+                                <i class="fa fa-folder text-gray-400"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-medium text-onBackground">Download</h3>
+                                <p class="text-sm text-muted">1 个条目</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 歌单列表 -->
+            <section id="playlists" class="hidden">
+                <div class="flex items-center justify-between mb-4">
+                    <span class="text-sm text-muted">3 个条目</span>
+                    <div class="flex items-center space-x-3">
+                        <button class="text-primary">
+                            <i class="fa fa-plus"></i>
+                        </button>
+                        <button class="text-muted">
+                            <i class="fa fa-filter"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between py-3">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center">
+                                <i class="fa fa-list text-gray-400"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-medium text-onBackground">最近添加</h3>
+                                <p class="text-sm text-muted">1 首歌曲</p>
+                            </div>
+                        </div>
+                        <button class="text-muted p-2">
+                            <i class="fa fa-ellipsis-v"></i>
+                        </button>
+                    </div>
+                    <div class="flex items-center justify-between py-3">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center">
+                                <i class="fa fa-heart text-gray-400"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-medium text-onBackground">收藏</h3>
+                                <p class="text-sm text-muted">0 首歌曲</p>
+                            </div>
+                        </div>
+                        <button class="text-muted p-2">
+                            <i class="fa fa-ellipsis-v"></i>
+                        </button>
+                    </div>
+                    <div class="flex items-center justify-between py-3">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center">
+                                <i class="fa fa-music text-gray-400"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-medium text-onBackground">爱好</h3>
+                                <p class="text-sm text-muted">0 首歌曲</p>
+                            </div>
+                        </div>
+                        <button class="text-muted p-2">
+                            <i class="fa fa-ellipsis-v"></i>
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- 迷你播放器 -->
+        <div class="mini-player px-4 py-3">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center">
+                        <i class="fa fa-music text-gray-400"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-medium text-onBackground text-sm">秋天不回来</h3>
+                        <p class="text-xs text-muted">王强</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button class="text-onBackground">
+                        <i class="fa fa-play"></i>
+                    </button>
+                    <button class="text-onBackground">
+                        <i class="fa fa-step-forward"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 播放器界面 (全屏) -->
+        <section id="player" class="hidden fixed inset-0 bg-surface z-50">
+            <!-- 顶部导航 -->
+            <div class="px-4 pt-12 pb-4 flex items-center justify-between">
+                <button id="closePlayer" class="text-muted">
+                    <i class="fa fa-chevron-down text-xl"></i>
+                </button>
+                <span class="text-sm text-muted">正在播放</span>
+                <button class="text-muted">
+                    <i class="fa fa-ellipsis-v text-xl"></i>
+                </button>
+            </div>
+
+            <!-- 专辑封面 -->
+            <div class="flex-1 flex items-center justify-center px-8 py-8">
+                <div class="w-72 h-72 bg-gray-200 rounded-2xl flex items-center justify-center">
+                    <i class="fa fa-music text-6xl text-gray-400"></i>
+                </div>
+            </div>
+
+            <!-- 歌曲信息 -->
+            <div class="px-8 mb-6 text-center">
+                <h2 class="text-2xl font-bold text-onBackground mb-1">秋天不回来</h2>
+                <p class="text-muted">王强</p>
+            </div>
+
+            <!-- 进度条 -->
+            <div class="px-8 mb-6">
+                <div class="h-1 bg-gray-200 rounded-full overflow-hidden">
+                    <div class="h-full bg-primary rounded-full" style="width: 100%"></div>
+                </div>
+                <div class="flex justify-between text-sm text-muted mt-2">
+                    <span>4:13</span>
+                    <span>4:13</span>
+                </div>
+            </div>
+
+            <!-- 播放控制 -->
+            <div class="px-8 mb-6">
+                <div class="flex items-center justify-center space-x-8">
+                    <button class="text-muted">
+                        <i class="fa fa-step-backward text-2xl"></i>
+                    </button>
+                    <button class="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+                        <i class="fa fa-play text-3xl text-primary"></i>
+                    </button>
+                    <button class="text-muted">
+                        <i class="fa fa-step-forward text-2xl"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 音量控制 -->
+            <div class="px-8 mb-6">
+                <div class="flex items-center space-x-3">
+                    <i class="fa fa-volume-down text-muted"></i>
+                    <div class="flex-1 h-1 bg-gray-200 rounded-full overflow-hidden">
+                        <div class="h-full bg-primary rounded-full" style="width: 30%"></div>
+                    </div>
+                    <i class="fa fa-volume-up text-muted"></i>
+                </div>
+            </div>
+
+            <!-- 底部控制 -->
+            <div class="px-8 pb-8">
+                <div class="flex items-center justify-between">
+                    <button class="text-muted">
+                        <i class="fa fa-list text-xl"></i>
+                    </button>
+                    <button class="text-muted">
+                        <i class="fa fa-repeat text-xl"></i>
+                    </button>
+                    <button class="text-muted">
+                        <i class="fa fa-random text-xl"></i>
+                    </button>
+                    <button class="text-muted">
+                        <i class="fa fa-bars text-xl"></i>
+                    </button>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        // 标签页切换
+        const tabs = document.querySelectorAll('.tab-active, .tab-inactive');
+        const sections = ['songs', 'artists', 'folders', 'playlists'];
+
+        tabs.forEach((tab, index) => {
+            tab.addEventListener('click', () => {
+                // 重置所有标签页样式
+                tabs.forEach(t => {
+                    t.classList.remove('tab-active');
+                    t.classList.add('tab-inactive');
+                });
+
+                // 激活当前标签页
+                tab.classList.remove('tab-inactive');
+                tab.classList.add('tab-active');
+
+                // 显示对应内容
+                sections.forEach((section, i) => {
+                    const el = document.getElementById(section);
+                    if (i === index) {
+                        el.classList.remove('hidden');
+                    } else {
+                        el.classList.add('hidden');
+                    }
+                });
+            });
+        });
+
+        // 迷你播放器点击展开全屏播放器
+        document.querySelector('.mini-player').addEventListener('click', () => {
+            document.getElementById('player').classList.remove('hidden');
+        });
+
+        // 关闭播放器
+        document.getElementById('closePlayer').addEventListener('click', () => {
+            document.getElementById('player').classList.add('hidden');
+        });
+    </script>
+</body>
+</html>
