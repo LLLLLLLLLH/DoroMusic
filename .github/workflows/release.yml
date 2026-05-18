@@ -5,8 +5,13 @@ on:
     tags:
       - 'v*'
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   release:
+    name: Build & Publish Release
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -24,9 +29,11 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Run tests and verify coverage
+        run: ./gradlew testDebugUnitTest jacocoTestCoverageVerification
+
       - name: Decode keystore
-        run: |
-          echo "${{ secrets.DORO_KEYSTORE_BASE64 }}" | base64 --decode > app/release.jks
+        run: echo "${{ secrets.DORO_KEYSTORE_BASE64 }}" | base64 --decode > app/release.jks
 
       - name: Build release APK
         env:
@@ -34,12 +41,6 @@ jobs:
           DORO_KEY_ALIAS: ${{ secrets.DORO_KEY_ALIAS }}
           DORO_KEY_PASSWORD: ${{ secrets.DORO_KEY_PASSWORD }}
         run: ./gradlew assembleRelease
-
-      - name: Run unit tests
-        run: ./gradlew testDebugUnitTest
-
-      - name: Verify coverage threshold
-        run: ./gradlew jacocoTestCoverageVerification
 
       - name: Extract version from tag
         id: version

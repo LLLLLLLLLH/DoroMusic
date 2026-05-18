@@ -6,8 +6,13 @@ on:
   pull_request:
     branches: [ main ]
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build:
+  check:
+    name: Test & Lint
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -28,46 +33,14 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
-      - name: Build debug APK
-        run: ./gradlew assembleDebug
-
-      - name: Decode keystore for release build
-        if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false)
-        run: echo "${{ secrets.DORO_KEYSTORE_BASE64 }}" | base64 --decode > app/release.jks
-
-      - name: Build release APK
-        if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false)
-        env:
-          DORO_KEYSTORE_PASSWORD: ${{ secrets.DORO_KEYSTORE_PASSWORD }}
-          DORO_KEY_ALIAS: ${{ secrets.DORO_KEY_ALIAS }}
-          DORO_KEY_PASSWORD: ${{ secrets.DORO_KEY_PASSWORD }}
-        run: ./gradlew assembleRelease
-
-      - name: Run Android Lint
-        run: ./gradlew lintDebug
-
-      - name: Run unit tests
-        run: ./gradlew testDebugUnitTest
-
-      - name: Generate JaCoCo coverage report
-        run: ./gradlew jacocoTestReport
-
-      - name: Verify coverage threshold (80%)
-        run: ./gradlew jacocoTestCoverageVerification
+      - name: Run tests, coverage verification, lint, and build
+        run: ./gradlew testDebugUnitTest jacocoTestReport jacocoTestCoverageVerification lintDebug assembleDebug
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: debug-apk
           path: app/build/outputs/apk/debug/*.apk
-          retention-days: 14
-
-      - name: Upload release APK
-        if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false)
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-apk
-          path: app/build/outputs/apk/release/*.apk
           retention-days: 14
 
       - name: Upload test results
@@ -78,7 +51,7 @@ jobs:
           path: app/build/reports/tests/
           retention-days: 7
 
-      - name: Upload JaCoCo coverage report
+      - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v4
         with:
