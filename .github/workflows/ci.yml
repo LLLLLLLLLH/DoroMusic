@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      pull-requests: write
 
     steps:
       - name: Checkout
@@ -95,7 +96,7 @@ jobs:
 
       - name: Comment PR with coverage summary
         if: github.event_name == 'pull_request'
-        uses: madrapps/jacoco-report@v17.2
+        uses: madrapps/jacoco-report@v1.7.2
         with:
           paths: app/build/reports/jacoco/jacocoTestReport/jacocoTestReport.xml
           token: ${{ secrets.GITHUB_TOKEN }}
