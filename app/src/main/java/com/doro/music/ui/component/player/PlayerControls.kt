@@ -21,8 +21,8 @@ import androidx.constraintlayout.compose.ConstraintSetScope
 import androidx.constraintlayout.compose.Dimension
 import androidx.constraintlayout.compose.layoutId
 import com.doro.music.data.model.PlayMode
-import com.doro.music.data.model.PlayerAction
 import com.doro.music.data.model.PlaybackState
+import com.doro.music.data.model.PlayerAction
 import com.doro.music.data.model.Song
 import com.doro.music.ui.component.IconAction
 
@@ -137,7 +137,6 @@ fun PlayerControls(
     playbackState: PlaybackState,
     playMode: PlayMode,
     currentPosition: Long,
-    duration: Long,
     onActionClick: (PlayerAction) -> Unit = {}
 ) {
 
@@ -167,7 +166,7 @@ fun PlayerControls(
         )
         PlayerSlider(
             position = currentPosition,
-            duration = duration,
+            duration = song?.duration ?: 0L,
             onSeek = { onActionClick(PlayerAction.SeekTo(it)) },
             modifier = Modifier.layoutId("slider")
         )

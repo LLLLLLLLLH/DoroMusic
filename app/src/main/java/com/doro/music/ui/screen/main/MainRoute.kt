@@ -32,6 +32,7 @@ import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
+import androidx.paging.compose.collectAsLazyPagingItems
 import com.doro.music.data.model.PlayerAction
 import com.doro.music.data.model.Song
 import com.doro.music.ext.safePop
@@ -75,14 +76,11 @@ private fun MainRoute(
     val backStack = rememberNavBackStack(Main)
 
     val playerViewType by vm.playerViewType.collectAsStateWithLifecycle()
-    val song by vm.currentSong.collectAsStateWithLifecycle()
-    val playbackState by vm.playbackState.collectAsStateWithLifecycle()
-    val playMode by vm.playMode.collectAsStateWithLifecycle()
+    val uiState by vm.uiState.collectAsStateWithLifecycle()
+    val currentSong by vm.currentSong.collectAsStateWithLifecycle()
     val currentPosition by vm.currentPosition.collectAsStateWithLifecycle()
-    val duration by vm.duration.collectAsStateWithLifecycle()
-    val playQueue by vm.playQueue.collectAsStateWithLifecycle()
-    val currentIndex by vm.currentIndex.collectAsStateWithLifecycle()
     val playerSheetState by vm.playerSheetState.collectAsStateWithLifecycle()
+    val queueItems = vm.playQueuePaging.collectAsLazyPagingItems()
     val isQueueVisible by vm.isQueueVisible.collectAsStateWithLifecycle()
 
     val bottomSheetScaffoldState = rememberBottomSheetScaffoldState()
@@ -122,11 +120,10 @@ private fun MainRoute(
                 modifier = Modifier,
                 sheetProgressState = sheetProgressState,
                 playerViewType = playerViewType,
-                song = song,
-                playbackState = playbackState,
-                playMode = playMode,
+                song = currentSong,
+                playbackState = uiState.playbackState,
+                playMode = uiState.playMode,
                 currentPosition = currentPosition,
-                duration = duration,
                 onActionClick = vm::handlePlayerAction,
             )
         },
@@ -166,8 +163,8 @@ private fun MainRoute(
             onDismissRequest = { vm.handlePlayerAction(PlayerAction.TogglePlayQueue) }
         ) {
             PlayQueue(
-                songs = playQueue,
-                currentIndex = currentIndex,
+                queueItems = queueItems,
+                currentQueueId = uiState.currentQueueId,
                 onSongClick = vm::seekToQueueItem,
                 onRemove = vm::removeFromPlayQueue
             )

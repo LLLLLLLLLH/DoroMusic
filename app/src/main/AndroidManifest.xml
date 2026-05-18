@@ -34,7 +34,7 @@
         android:theme="@style/Theme.DoroMusic"
         tools:targetApi="33">
         <service
-            android:name=".player.MusicService"
+            android:name=".player.service.PlayerService"
             android:enabled="true"
             android:exported="true"
             android:foregroundServiceType="mediaPlayback">
@@ -47,7 +47,6 @@
             android:name=".ui.MainActivity"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|layoutDirection|locale"
             android:exported="true"
-            android:label="@string/app_name"
             android:theme="@style/Theme.DoroMusic">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

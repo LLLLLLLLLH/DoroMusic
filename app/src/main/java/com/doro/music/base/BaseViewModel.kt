@@ -9,29 +9,31 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 abstract class BaseViewModel : ViewModel() {
 
-    val sortMode: StateFlow<SortMode>
-        field = MutableStateFlow<SortMode>(getDefaultSortMode())
+    private val _sortMode = MutableStateFlow<SortMode>(getDefaultSortMode())
+    val sortMode: StateFlow<SortMode> = _sortMode.asStateFlow()
 
-    val displayMode: StateFlow<DisplayMode>
-        field = MutableStateFlow<DisplayMode>(DisplayMode.LIST)
+    private val _displayMode = MutableStateFlow<DisplayMode>(DisplayMode.LIST)
+    val displayMode: StateFlow<DisplayMode> = _displayMode.asStateFlow()
 
-    val uiEvent: SharedFlow<UiEvent>
-        field = MutableSharedFlow<UiEvent>()
+    private val _uiEvent = MutableSharedFlow<UiEvent>()
+    val uiEvent: SharedFlow<UiEvent> = _uiEvent.asSharedFlow()
 
     fun setSortBy(sort: SortMode) {
-        sortMode.tryEmit(sort)
+        _sortMode.tryEmit(sort)
     }
 
     fun setDisplayMode(mode: DisplayMode) {
-        displayMode.tryEmit(mode)
+        _displayMode.tryEmit(mode)
     }
 
     protected fun emitEvent(event: UiEvent) {
-        viewModelScope.launch { uiEvent.emit(event) }
+        viewModelScope.launch { _uiEvent.emit(event) }
     }
 
     protected suspend fun <T> safeCall(

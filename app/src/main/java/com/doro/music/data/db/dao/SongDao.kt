@@ -71,4 +71,7 @@ interface SongDao {
 
     @Query("SELECT COUNT(*) FROM songs WHERE artist = :name")
     fun getSongCountByArtist(name: String): Flow<Int>
+
+    @Query("SELECT * FROM songs WHERE id = :id LIMIT 1")
+    suspend fun getSongById(id: Long): SongEntity?
 }

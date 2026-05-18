@@ -62,6 +62,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        vm.connect()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        vm.disconnect()
+    }
+
     private fun isDarkMode(mode: DarkThemeMode): Boolean = when (mode) {
         DarkThemeMode.SYSTEM -> {
             val nightMode = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK

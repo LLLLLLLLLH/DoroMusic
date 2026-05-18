@@ -25,4 +25,8 @@ class SongRepo(private val songDao: SongDao) {
         songDao.getAllSongsSortedBy(sortMode).toSongs()
     }
 
+    suspend fun getSongById(id: Long) = withContext(Dispatchers.IO) {
+        songDao.getSongById(id)?.toSong()
+    }
+
 }
