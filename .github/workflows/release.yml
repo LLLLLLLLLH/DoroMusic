@@ -1,0 +1,56 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.DORO_KEYSTORE_BASE64 }}" | base64 --decode > app/release.jks
+
+      - name: Build release APK
+        env:
+          DORO_KEYSTORE_PASSWORD: ${{ secrets.DORO_KEYSTORE_PASSWORD }}
+          DORO_KEY_ALIAS: ${{ secrets.DORO_KEY_ALIAS }}
+          DORO_KEY_PASSWORD: ${{ secrets.DORO_KEY_PASSWORD }}
+        run: ./gradlew assembleRelease
+
+      - name: Run unit tests
+        run: ./gradlew testDebugUnitTest
+
+      - name: Verify coverage threshold
+        run: ./gradlew jacocoTestCoverageVerification
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: DoroMusic ${{ steps.version.outputs.version }}
+          generate_release_notes: true
+          files: app/build/outputs/apk/release/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
