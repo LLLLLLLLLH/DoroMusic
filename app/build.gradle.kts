@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -26,10 +28,15 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = file("release.jks")
-            storePassword = System.getenv("DORO_KEYSTORE_PASSWORD") ?: "doro123456"
-            keyAlias = System.getenv("DORO_KEY_ALIAS") ?: "doro"
-            keyPassword = System.getenv("DORO_KEY_PASSWORD") ?: "doro123456"
+            val localProps = Properties()
+            val localPropsFile = rootProject.file("local.properties")
+            if (localPropsFile.exists()) {
+                localProps.load(localPropsFile.inputStream())
+            }
+            storeFile = file(System.getenv("DORO_KEYSTORE_PATH") ?: localProps.getProperty("keystore.path") ?: "release.jks")
+            storePassword = System.getenv("DORO_KEYSTORE_PASSWORD") ?: localProps.getProperty("keystore.password")
+            keyAlias = System.getenv("DORO_KEY_ALIAS") ?: localProps.getProperty("keystore.alias") ?: "doro"
+            keyPassword = System.getenv("DORO_KEY_PASSWORD") ?: localProps.getProperty("keystore.alias.password")
         }
     }
 

@@ -30,15 +30,43 @@ jobs:
       - name: Build debug APK
         run: ./gradlew assembleDebug
 
+      - name: Decode keystore for release build
+        if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false)
+        run: echo "${{ secrets.DORO_KEYSTORE_BASE64 }}" | base64 --decode > app/release.jks
+
+      - name: Build release APK
+        if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false)
+        env:
+          DORO_KEYSTORE_PASSWORD: ${{ secrets.DORO_KEYSTORE_PASSWORD }}
+          DORO_KEY_ALIAS: ${{ secrets.DORO_KEY_ALIAS }}
+          DORO_KEY_PASSWORD: ${{ secrets.DORO_KEY_PASSWORD }}
+        run: ./gradlew assembleRelease
+
+      - name: Run Android Lint
+        run: ./gradlew lintDebug
+
       - name: Run unit tests
         run: ./gradlew testDebugUnitTest
 
+      - name: Generate JaCoCo coverage report
+        run: ./gradlew jacocoTestReport
+
+      - name: Verify coverage threshold (80%)
+        run: ./gradlew jacocoTestCoverageVerification
+
       - name: Upload debug APK
-        if: github.event_name == 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: debug-apk
           path: app/build/outputs/apk/debug/*.apk
+          retention-days: 14
+
+      - name: Upload release APK
+        if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false)
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-apk
+          path: app/build/outputs/apk/release/*.apk
           retention-days: 14
 
       - name: Upload test results
@@ -48,3 +76,30 @@ jobs:
           name: test-results
           path: app/build/reports/tests/
           retention-days: 7
+
+      - name: Upload JaCoCo coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: app/build/reports/jacoco/jacocoTestReport/html/
+          retention-days: 14
+
+      - name: Upload Lint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-report
+          path: app/build/reports/lint-results-debug.html
+          retention-days: 14
+
+      - name: Comment PR with coverage summary
+        if: github.event_name == 'pull_request'
+        uses: madrapps/jacoco-report@v17.2
+        with:
+          paths: app/build/reports/jacoco/jacocoTestReport/jacocoTestReport.xml
+          token: ${{ secrets.GITHUB_TOKEN }}
+          min-coverage-overall: 80
+          min-coverage-changed-files: 80
+          title: JaCoCo Coverage Report
+          update-comment: true
