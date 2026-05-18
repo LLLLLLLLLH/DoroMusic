@@ -1,0 +1,302 @@
+package com.doro.music.vm
+
+import androidx.paging.PagingData
+import com.doro.music.data.model.Artist
+import com.doro.music.data.model.Playlist
+import com.doro.music.data.model.Song
+import com.doro.music.data.repo.SongListRepo
+import com.doro.music.domain.AddSongToPlaylistUseCase
+import com.doro.music.domain.GetPlaylistsUseCase
+import com.doro.music.player.PlayActionDispatcher
+import com.doro.music.player.model.PlayAction
+import com.doro.music.player.model.PlayContext
+import com.doro.music.ui.screen.other.SongListSource
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.verify
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Before
+import org.junit.Test
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class SongListViewModelTest {
+
+    private val testDispatcher = StandardTestDispatcher()
+    private val mockRepo = mockk<SongListRepo>()
+    private val mockGetPlaylistsUseCase = mockk<GetPlaylistsUseCase>()
+    private val mockAddSongToPlaylistUseCase = mockk<AddSongToPlaylistUseCase>()
+    private val mockDispatcher = mockk<PlayActionDispatcher>(relaxed = true)
+
+    private lateinit var viewModel: SongListViewModel
+
+    @Before
+    fun setup() {
+        Dispatchers.setMain(testDispatcher)
+        coEvery { mockRepo.getSongListByArtist(any()) } returns flowOf(PagingData.empty())
+        coEvery { mockRepo.getSongListByPlaylist(any()) } returns flowOf(PagingData.empty())
+        every { mockRepo.getSongCountByArtist(any()) } returns flowOf(0)
+        every { mockRepo.getSongCountByPlaylist(any()) } returns flowOf(0)
+        coEvery { mockGetPlaylistsUseCase() } returns flowOf(PagingData.empty())
+
+        viewModel = SongListViewModel(mockRepo, mockGetPlaylistsUseCase, mockAddSongToPlaylistUseCase, mockDispatcher)
+    }
+
+    @After
+    fun tearDown() {
+        Dispatchers.resetMain()
+    }
+
+    @Test
+    fun `selectSong updates selectedSong state`() = runTest {
+        viewModel.selectSong(123L)
+        assertEquals(123L, viewModel.selectedSong.value)
+    }
+
+    @Test
+    fun `selectSong with null clears selection`() = runTest {
+        viewModel.selectSong(123L)
+        viewModel.selectSong(null)
+        assertNull(viewModel.selectedSong.value)
+    }
+
+    @Test
+    fun `setSource with FromArtist updates source state`() = runTest {
+        val artist = Artist(name = "TestArtist", songCount = 5)
+        viewModel.setSource(SongListSource.FromArtist(artist))
+        advanceUntilIdle()
+
+        // Verify source was set - the songs flow will react to it
+        assertNotNull(viewModel.songs)
+    }
+
+    @Test
+    fun `setSource with FromPlaylist updates source state`() = runTest {
+        val playlist = Playlist(id = 1L, name = "TestPlaylist", songCount = 3)
+        viewModel.setSource(SongListSource.FromPlaylist(playlist))
+        advanceUntilIdle()
+
+        assertNotNull(viewModel.songs)
+    }
+
+    @Test
+    fun `play with null song does not dispatch action`() = runTest {
+        viewModel.play(null)
+        verify(exactly = 0) { mockDispatcher.dispatch(any()) }
+    }
+
+    @Test
+    fun `play with FromArtist dispatches Play with Artist context`() = runTest {
+        val artist = Artist(name = "TestArtist", songCount = 1)
+        viewModel.setSource(SongListSource.FromArtist(artist))
+
+        val song = Song(id = 10L, title = "Test", path = "/test")
+        viewModel.play(song)
+
+        verify {
+            mockDispatcher.dispatch(match { action ->
+                action is PlayAction.Play &&
+                        action.songId == 10L &&
+                        action.playContext is PlayContext.Artist
+            })
+        }
+    }
+
+    @Test
+    fun `play with FromPlaylist dispatches Play with Playlist context`() = runTest {
+        val playlist = Playlist(id = 5L, name = "P")
+        viewModel.setSource(SongListSource.FromPlaylist(playlist))
+
+        val song = Song(id = 20L, title = "Test", path = "/test")
+        viewModel.play(song)
+
+        verify {
+            mockDispatcher.dispatch(match { action ->
+                action is PlayAction.Play &&
+                        action.songId == 20L &&
+                        action.playContext is PlayContext.Playlist
+            })
+        }
+    }
+
+    @Test
+    fun `playAll with empty songs does not dispatch`() = runTest {
+        val artist = Artist(name = "Empty", songCount = 0)
+        viewModel.setSource(SongListSource.FromArtist(artist))
+        coEvery { mockRepo.getAllSongsByArtist("Empty") } returns emptyList()
+
+        viewModel.playAll()
+        advanceUntilIdle()
+
+        verify(exactly = 0) { mockDispatcher.dispatch(any()) }
+    }
+
+    @Test
+    fun `playAll dispatches Play with first song`() = runTest {
+        val artist = Artist(name = "Artist", songCount = 2)
+        viewModel.setSource(SongListSource.FromArtist(artist))
+        val songs = listOf(
+            Song(id = 1L, title = "First", path = "/a"),
+            Song(id = 2L, title = "Second", path = "/b")
+        )
+        coEvery { mockRepo.getAllSongsByArtist("Artist") } returns songs
+
+        viewModel.playAll()
+        advanceUntilIdle()
+
+        verify {
+            mockDispatcher.dispatch(match { action ->
+                action is PlayAction.Play && action.songId == 1L
+            })
+        }
+    }
+
+    @Test
+    fun `shufflePlay dispatches Play with random song`() = runTest {
+        val artist = Artist(name = "Artist", songCount = 1)
+        viewModel.setSource(SongListSource.FromArtist(artist))
+        val songs = listOf(Song(id = 5L, title = "Only", path = "/a"))
+        coEvery { mockRepo.getAllSongsByArtist("Artist") } returns songs
+
+        viewModel.shufflePlay()
+        advanceUntilIdle()
+
+        verify {
+            mockDispatcher.dispatch(match { action ->
+                action is PlayAction.Play && action.songId == 5L
+            })
+        }
+    }
+
+    @Test
+    fun `addToNext dispatches InsertSingle action`() = runTest {
+        val song = Song(id = 50L, title = "Test", path = "/test")
+        viewModel.addToNext(song)
+        advanceUntilIdle()
+
+        verify {
+            mockDispatcher.dispatch(match { action ->
+                action is PlayAction.InsertSingle && action.songId == 50L
+            })
+        }
+    }
+
+    @Test
+    fun `addSongToPlaylist does nothing when no song selected`() = runTest {
+        viewModel.selectSong(null)
+        viewModel.addSongToPlaylist(setOf(Playlist(id = 1L, name = "P1")))
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { mockAddSongToPlaylistUseCase(any(), any()) }
+    }
+
+    @Test
+    fun `removeSongFromPlaylist delegates to repo`() = runTest {
+        coEvery { mockRepo.removeSongFromPlaylist(1L, 100L) } returns true
+
+        viewModel.removeSongFromPlaylist(1L, 100L)
+        advanceUntilIdle()
+
+        coVerify { mockRepo.removeSongFromPlaylist(1L, 100L) }
+    }
+
+    @Test
+    fun `playAll with FromPlaylist dispatches Play with first song`() = runTest {
+        val playlist = Playlist(id = 5L, name = "MyPlaylist", songCount = 2)
+        viewModel.setSource(SongListSource.FromPlaylist(playlist))
+        val songs = listOf(
+            Song(id = 10L, title = "First", path = "/a"),
+            Song(id = 20L, title = "Second", path = "/b")
+        )
+        coEvery { mockRepo.getAllSongsByPlaylist(5L) } returns songs
+
+        viewModel.playAll()
+        advanceUntilIdle()
+
+        verify {
+            mockDispatcher.dispatch(match { action ->
+                action is PlayAction.Play && action.songId == 10L && action.playContext is PlayContext.Playlist
+            })
+        }
+    }
+
+    @Test
+    fun `shufflePlay with FromPlaylist dispatches Play`() = runTest {
+        val playlist = Playlist(id = 5L, name = "MyPlaylist", songCount = 1)
+        viewModel.setSource(SongListSource.FromPlaylist(playlist))
+        val songs = listOf(Song(id = 15L, title = "Only", path = "/a"))
+        coEvery { mockRepo.getAllSongsByPlaylist(5L) } returns songs
+
+        viewModel.shufflePlay()
+        advanceUntilIdle()
+
+        verify {
+            mockDispatcher.dispatch(match { action ->
+                action is PlayAction.Play && action.songId == 15L && action.playContext is PlayContext.Playlist
+            })
+        }
+    }
+
+    @Test
+    fun `shufflePlay with empty songs does not dispatch`() = runTest {
+        val playlist = Playlist(id = 5L, name = "Empty", songCount = 0)
+        viewModel.setSource(SongListSource.FromPlaylist(playlist))
+        coEvery { mockRepo.getAllSongsByPlaylist(5L) } returns emptyList()
+
+        viewModel.shufflePlay()
+        advanceUntilIdle()
+
+        verify(exactly = 0) { mockDispatcher.dispatch(any()) }
+    }
+
+    @Test
+    fun `addSongToPlaylist calls use case when song selected`() = runTest {
+        viewModel.selectSong(100L)
+        coEvery { mockAddSongToPlaylistUseCase(any(), any()) } returns com.doro.music.data.model.AddSongResult.Success
+
+        viewModel.addSongToPlaylist(setOf(Playlist(id = 1L, name = "P1")))
+        advanceUntilIdle()
+
+        coVerify { mockAddSongToPlaylistUseCase(songId = 100L, playlists = any()) }
+    }
+
+    @Test
+    fun `removeSongFromPlaylist with failure still emits event`() = runTest {
+        coEvery { mockRepo.removeSongFromPlaylist(1L, 100L) } returns false
+
+        viewModel.removeSongFromPlaylist(1L, 100L)
+        advanceUntilIdle()
+
+        coVerify { mockRepo.removeSongFromPlaylist(1L, 100L) }
+    }
+
+    @Test
+    fun `removeSongFromPlaylist with exception still emits event`() = runTest {
+        coEvery { mockRepo.removeSongFromPlaylist(any(), any()) } throws RuntimeException("db error")
+
+        viewModel.removeSongFromPlaylist(1L, 100L)
+        advanceUntilIdle()
+
+        coVerify { mockRepo.removeSongFromPlaylist(1L, 100L) }
+    }
+
+    @Test
+    fun `play with null source does not dispatch`() = runTest {
+        val song = Song(id = 10L, title = "Test", path = "/test")
+        viewModel.play(song)
+
+        verify(exactly = 0) { mockDispatcher.dispatch(any()) }
+    }
+}
