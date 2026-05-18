@@ -79,7 +79,6 @@ fun FullPlayer(
     playbackState: PlaybackState,
     playMode: PlayMode,
     currentPosition: Long,
-    duration: Long,
     onActionClick: (PlayerAction) -> Unit = {}
 ) {
     val isLandscape = rememberIsLandscape()
@@ -111,7 +110,6 @@ fun FullPlayer(
             playbackState = playbackState,
             playMode = playMode,
             currentPosition = currentPosition,
-            duration = duration,
             onActionClick = onActionClick
         )
     }

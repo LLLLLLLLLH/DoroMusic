@@ -1,115 +1,125 @@
+@file:OptIn(ExperimentalCoroutinesApi::class)
+
 package com.doro.music.vm
 
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.paging.cachedIn
 import com.doro.music.data.model.PlayerAction
 import com.doro.music.data.model.Song
-import com.doro.music.data.repo.PlaybackRepository
+import com.doro.music.data.repo.SongRepo
+import com.doro.music.player.PlayActionDispatcher
+import com.doro.music.player.PlayStateObserver
+import com.doro.music.player.model.PlayAction
+import com.doro.music.player.model.PlayUiState
 import com.doro.music.ui.component.player.PlayerSheetState
 import com.doro.music.ui.component.player.PlayerViewType
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+/**
+ * 播放器 ViewModel
+ *
+ * 连接播放架构与 UI 层：
+ * - 从 PlayStateObserver 读取播放状态和进度
+ * - 通过 PlayActionDispatcher 分发用户操作
+ * - 通过 PlayStateObserver.playQueue 提供播放队列 Paging3 数据
+ */
 class PlayerViewModel(
-    private val playbackRepository: PlaybackRepository
+    private val stateObserver: PlayStateObserver,
+    private val actionDispatcher: PlayActionDispatcher,
+    private val songRepo: SongRepo
 ) : ViewModel() {
 
     private companion object {
-        private const val TAG = "PlayerViewModel"
+        const val TAG = "PlayerViewModel"
     }
 
-    val playbackState = playbackRepository.playbackState
+    // ==================== 核心状态 ====================
 
-    val currentSong = playbackRepository.currentSong
+    val uiState: StateFlow<PlayUiState> = stateObserver.uiState.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000L),
+        initialValue = PlayUiState.Empty
+    )
 
-    val playQueue = playbackRepository.playQueue
+    /** 当前播放位置（高频数据，独立 Flow） */
+    val currentPosition: StateFlow<Long> = stateObserver.currentPositionMs.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000L),
+        initialValue = 0L
+    )
 
-    val currentIndex = playbackRepository.currentIndex
+    val currentSong: StateFlow<Song?> = uiState
+        .mapLatest { state -> state.currentSongId?.let { songRepo.getSongById(it) } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
-    val currentPosition = playbackRepository.currentPosition
+    // ==================== 播放队列 Paging3 ====================
 
-    val duration = playbackRepository.duration
+    val playQueuePaging = stateObserver.playQueue.cachedIn(viewModelScope)
 
-    val playMode = playbackRepository.playMode
+    // ==================== UI 状态 ====================
 
-    val playerViewType: StateFlow<PlayerViewType>
-        field = MutableStateFlow(PlayerViewType.DISC)
-
-    val playerSheetState: StateFlow<PlayerSheetState>
-        field = MutableStateFlow<PlayerSheetState>(PlayerSheetState.Hidden)
-
-    val isQueueVisible: StateFlow<Boolean>
-        field = MutableStateFlow(false)
+    val playerViewType: MutableStateFlow<PlayerViewType> = MutableStateFlow(PlayerViewType.DISC)
+    val playerSheetState: MutableStateFlow<PlayerSheetState> = MutableStateFlow(PlayerSheetState.Hidden)
+    val isQueueVisible: MutableStateFlow<Boolean> = MutableStateFlow(false)
 
     init {
-        initializeRepository()
-
-        playQueue.onEach { queue ->
-            when {
-                queue.isEmpty() -> {
+        // 监听播放状态，自动控制 playerSheetState
+        viewModelScope.launch {
+            uiState.collect { state ->
+                if (state.currentQueueId == null) {
                     playerSheetState.value = PlayerSheetState.Hidden
                     isQueueVisible.value = false
-                }
-                playerSheetState.value == PlayerSheetState.Hidden -> {
+                } else if (playerSheetState.value == PlayerSheetState.Hidden) {
                     playerSheetState.value = PlayerSheetState.Collapsed
                 }
             }
-        }.launchIn(viewModelScope)
-    }
-
-    private fun initializeRepository() {
-        viewModelScope.launch {
-            try {
-                playbackRepository.initialize()
-                Log.d(TAG, "Repository initialized successfully")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to initialize repository", e)
-            }
         }
     }
 
+    // ==================== 播放操作 ====================
+
+    /**
+     * 处理 UI 层的 PlayerAction
+     */
     fun handlePlayerAction(action: PlayerAction) {
-        viewModelScope.launch {
-            try {
-                when (action) {
-                    PlayerAction.TogglePlayPause -> playbackRepository.togglePlayPause()
-                    PlayerAction.Next -> playbackRepository.next()
-                    PlayerAction.Previous -> playbackRepository.previous()
-                    is PlayerAction.SeekTo -> playbackRepository.seekTo(action.positionMs)
-                    PlayerAction.TogglePlayMode -> playbackRepository.togglePlayMode()
-                    PlayerAction.TogglePlayerView -> togglePlayerView()
-                    PlayerAction.TogglePlayerSheet -> togglePlayerSheet()
-                    PlayerAction.TogglePlayQueue -> togglePlayQueue()
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error handling player action: ${action::class.simpleName}", e)
-            }
+        when (action) {
+            is PlayerAction.TogglePlayPause -> actionDispatcher.dispatch(PlayAction.TogglePlay)
+            is PlayerAction.Next -> actionDispatcher.dispatch(PlayAction.Next)
+            is PlayerAction.Previous -> actionDispatcher.dispatch(PlayAction.Prev)
+            is PlayerAction.SeekTo -> actionDispatcher.dispatch(PlayAction.SeekTo(action.positionMs))
+            is PlayerAction.TogglePlayMode -> actionDispatcher.dispatch(PlayAction.TogglePlayMode)
+            is PlayerAction.TogglePlayerView -> togglePlayerView()
+            is PlayerAction.TogglePlayerSheet -> togglePlayerSheet()
+            is PlayerAction.TogglePlayQueue -> togglePlayQueue()
         }
     }
 
+    /**
+     * 添加单首歌曲到下一首播放
+     */
     fun addToNext(song: Song) {
-        viewModelScope.launch {
-            try {
-                playbackRepository.addToQueue(listOf(song))
-            } catch (e: Exception) {
-                Log.e(TAG, "Error adding song to queue", e)
-            }
-        }
+        actionDispatcher.dispatch(PlayAction.InsertSingle(song.id))
     }
 
-    fun addToNext(songs: List<Song>) {
-        viewModelScope.launch {
-            try {
-                playbackRepository.addToQueue(songs)
-            } catch (e: Exception) {
-                Log.e(TAG, "Error adding songs to queue", e)
-            }
-        }
+    /**
+     * 从播放队列移除指定 queueId 的歌曲
+     */
+    fun removeFromPlayQueue(queueId: Long) {
+        actionDispatcher.dispatch(PlayAction.Remove(queueId))
     }
+
+    fun seekToQueueItem(queueId: Long) {
+        actionDispatcher.dispatch(PlayAction.SeekToQueueItem(queueId))
+    }
+
+    // ==================== UI 辅助方法 ====================
 
     private fun togglePlayerView() {
         playerViewType.value = when (playerViewType.value) {
@@ -130,37 +140,17 @@ class PlayerViewModel(
         isQueueVisible.value = !isQueueVisible.value
     }
 
-    fun removeFromPlayQueue(index: Int) {
-        viewModelScope.launch {
-            try {
-                playbackRepository.removeFromQueue(index)
-            } catch (e: Exception) {
-                Log.e(TAG, "Error removing song from queue", e)
-            }
-        }
-    }
-
     fun handleBack(): Boolean {
         return when {
-            isQueueVisible.value -> { isQueueVisible.value = false; true }
+            isQueueVisible.value -> {
+                isQueueVisible.value = false; true
+            }
+
             playerSheetState.value == PlayerSheetState.Expanded -> {
                 playerSheetState.value = PlayerSheetState.Collapsed; true
             }
+
             else -> false
         }
-    }
-
-    fun seekToQueueItem(index: Int) {
-        viewModelScope.launch {
-            try {
-                playbackRepository.seekToQueueItem(index)
-            } catch (e: Exception) {
-                Log.e(TAG, "Error seeking to queue item", e)
-            }
-        }
-    }
-
-    override fun onCleared() {
-        viewModelScope.launch { playbackRepository.release() }
     }
 }

@@ -5,9 +5,11 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import com.doro.music.base.BaseViewModel
 import com.doro.music.data.model.Artist
+import com.doro.music.data.model.Song
 import com.doro.music.data.repo.ArtistRepo
-import com.doro.music.data.repo.SongListRepo
-import com.doro.music.data.repo.PlaybackRepository
+import com.doro.music.player.model.PlayAction
+import com.doro.music.player.model.PlayContext
+import com.doro.music.player.PlayActionDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
@@ -15,23 +17,16 @@ import kotlinx.coroutines.launch
 
 class ArtistsViewModel(
     private val repo: ArtistRepo,
-    private val songListRepo: SongListRepo,
-    private val playbackRepository: PlaybackRepository
+    private val actionDispatcher: PlayActionDispatcher
 ) : BaseViewModel() {
 
     val artists: Flow<PagingData<Artist>> = repo.getArtists().cachedIn(viewModelScope)
-
     val artistCount = repo.getArtistCount()
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000L),
-            initialValue = 0
-        )
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), 0)
 
     fun addArtistToNext(name: String) {
         viewModelScope.launch {
-            val songs = songListRepo.getAllSongsByArtist(name)
-            if (songs.isNotEmpty()) playbackRepository.addToQueue(songs)
+            actionDispatcher.dispatch(PlayAction.InsertGroup(PlayContext.Artist(name, sortMode.value)))
         }
     }
 }

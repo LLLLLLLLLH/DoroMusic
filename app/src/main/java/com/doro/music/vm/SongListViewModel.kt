@@ -12,9 +12,10 @@ import com.doro.music.data.model.UiEvent
 import com.doro.music.data.repo.SongListRepo
 import com.doro.music.domain.AddSongToPlaylistUseCase
 import com.doro.music.domain.GetPlaylistsUseCase
-import com.doro.music.domain.PlaySongsUseCase
+import com.doro.music.player.model.PlayAction
+import com.doro.music.player.model.PlayContext
+import com.doro.music.player.PlayActionDispatcher
 import com.doro.music.ui.screen.other.SongListSource
-import com.doro.music.data.repo.PlaybackRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -28,15 +29,12 @@ class SongListViewModel(
     private val repo: SongListRepo,
     private val getPlaylistsUseCase: GetPlaylistsUseCase,
     private val addSongToPlaylistUseCase: AddSongToPlaylistUseCase,
-    private val playbackRepository: PlaybackRepository,
-    private val playSongsUseCase: PlaySongsUseCase
+    private val dispatcher: PlayActionDispatcher
 ) : BaseViewModel() {
 
     val playlist = getPlaylistsUseCase().cachedIn(viewModelScope)
-
     val selectedSong: StateFlow<Long?>
         field = MutableStateFlow<Long?>(null)
-
     private val source = MutableStateFlow<SongListSource?>(null)
 
     val songs = source.filterNotNull().flatMapLatest {
@@ -51,29 +49,56 @@ class SongListViewModel(
             is SongListSource.FromArtist -> repo.getSongCountByArtist(it.artist.name)
             is SongListSource.FromPlaylist -> repo.getSongCountByPlaylist(it.playlist.id)
         }
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000L),
-        initialValue = 0
-    )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), 0)
 
     fun setSource(source: SongListSource) {
         this.source.tryEmit(source)
     }
 
-    fun play(song: Song? = null, randomize: Boolean = false) {
+    fun play(song: Song? = null) {
         val currentSource = source.value ?: return
+        val targetSongId = song?.id ?: return
+        val context = when (currentSource) {
+            is SongListSource.FromArtist -> PlayContext.Artist(currentSource.artist.name, sortMode.value)
+            is SongListSource.FromPlaylist -> PlayContext.Playlist(currentSource.playlist.id, sortMode.value)
+        }
+        dispatcher.dispatch(PlayAction.Play(targetSongId, context))
+    }
+
+    fun playAll() {
         viewModelScope.launch {
-            val songs = when (currentSource) {
+            val currentSource = source.value ?: return@launch
+            val allSongs = when (currentSource) {
                 is SongListSource.FromArtist -> repo.getAllSongsByArtist(currentSource.artist.name)
                 is SongListSource.FromPlaylist -> repo.getAllSongsByPlaylist(currentSource.playlist.id)
             }
-            playSongsUseCase(songs, song, randomize)
+            val firstSong = allSongs.firstOrNull() ?: return@launch
+            val context = when (currentSource) {
+                is SongListSource.FromArtist -> PlayContext.Artist(currentSource.artist.name, sortMode.value)
+                is SongListSource.FromPlaylist -> PlayContext.Playlist(currentSource.playlist.id, sortMode.value)
+            }
+            dispatcher.dispatch(PlayAction.Play(firstSong.id, context))
+        }
+    }
+
+    fun shufflePlay() {
+        viewModelScope.launch {
+            val currentSource = source.value ?: return@launch
+            val allSongs = when (currentSource) {
+                is SongListSource.FromArtist -> repo.getAllSongsByArtist(currentSource.artist.name)
+                is SongListSource.FromPlaylist -> repo.getAllSongsByPlaylist(currentSource.playlist.id)
+            }
+            val randomSong = allSongs.randomOrNull() ?: return@launch
+            val context = when (currentSource) {
+                is SongListSource.FromArtist -> PlayContext.Artist(currentSource.artist.name, sortMode.value)
+                is SongListSource.FromPlaylist -> PlayContext.Playlist(currentSource.playlist.id, sortMode.value)
+            }
+            dispatcher.dispatch(PlayAction.Play(randomSong.id, context))
         }
     }
 
     fun addToNext(song: Song) {
-        viewModelScope.launch { playbackRepository.addToQueue(listOf(song)) }
+        viewModelScope.launch { dispatcher.dispatch(PlayAction.InsertSingle(song.id)) }
     }
 
     fun addSongToPlaylist(playlists: Set<Playlist>) {
@@ -87,8 +112,7 @@ class SongListViewModel(
 
     fun removeSongFromPlaylist(playlistId: Long, songId: Long) {
         viewModelScope.launch {
-            val success = safeCall { repo.removeSongFromPlaylist(playlistId, songId) }
-                .getOrDefault(false)
+            val success = safeCall { repo.removeSongFromPlaylist(playlistId, songId) }.getOrDefault(false)
             emitEvent(UiEvent.SongRemovedFromPlaylist(success))
         }
     }
@@ -96,5 +120,4 @@ class SongListViewModel(
     fun selectSong(id: Long?) {
         selectedSong.tryEmit(id)
     }
-
 }

@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -33,23 +32,26 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.paging.compose.LazyPagingItems
+import androidx.paging.compose.itemKey
 import com.doro.music.R
-import com.doro.music.data.model.Song
+import com.doro.music.player.model.QueueSong
 import com.doro.music.ui.component.ArtworkImage
 
 @Composable
 fun PlayQueue(
     modifier: Modifier = Modifier,
-    songs: List<Song>,
-    currentIndex: Int,
-    onSongClick: (Int) -> Unit = {},
-    onRemove: (Int) -> Unit = {}
+    queueItems: LazyPagingItems<QueueSong>,
+    currentQueueId: Long?,
+    onSongClick: (Long) -> Unit = {},
+    onRemove: (Long) -> Unit = {}
 ) {
     val listState = rememberLazyListState()
 
-    LaunchedEffect(currentIndex) {
-        if (currentIndex in songs.indices) {
-            listState.animateScrollToItem(currentIndex)
+    LaunchedEffect(currentQueueId) {
+        val targetIndex = queueItems.itemSnapshotList.items.indexOfFirst { it.queueId == currentQueueId }
+        if (targetIndex >= 0) {
+            listState.animateScrollToItem(targetIndex)
         }
     }
 
@@ -67,8 +69,10 @@ fun PlayQueue(
                 fontSize = 18.sp,
                 fontWeight = FontWeight.SemiBold
             )
+            val totalCount = queueItems.itemCount
+            val currentPos = queueItems.itemSnapshotList.items.indexOfFirst { it.queueId == currentQueueId }
             Text(
-                text = stringResource(R.string.play_queue_count, currentIndex + 1, songs.size),
+                text = stringResource(R.string.play_queue_count, currentPos + 1, totalCount),
                 fontSize = 14.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -77,15 +81,16 @@ fun PlayQueue(
         HorizontalDivider()
 
         LazyColumn(state = listState) {
-            itemsIndexed(
-                items = songs,
-                key = { index, song -> "$index${song.id}" }
-            ) { index, song ->
+            items(
+                count = queueItems.itemCount,
+                key = queueItems.itemKey { it.queueId }
+            ) { index ->
+                val queueSong = queueItems[index] ?: return@items
                 PlayQueueItem(
-                    song = song,
-                    isActive = index == currentIndex,
-                    onClick = { onSongClick(index) },
-                    onRemove = { onRemove(index) }
+                    song = queueSong,
+                    isActive = queueSong.queueId == currentQueueId,
+                    onClick = { onSongClick(queueSong.queueId) },
+                    onRemove = { onRemove(queueSong.queueId) }
                 )
             }
         }
@@ -95,7 +100,7 @@ fun PlayQueue(
 @Composable
 private fun PlayQueueItem(
     modifier: Modifier = Modifier,
-    song: Song,
+    song: QueueSong,
     isActive: Boolean,
     onClick: () -> Unit = {},
     onRemove: () -> Unit = {}
@@ -115,7 +120,7 @@ private fun PlayQueueItem(
                 .size(40.dp)
                 .clip(RoundedCornerShape(6.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant),
-            imageUrl = song.albumArt,
+            imageUrl = song.song.albumArt,
             placeholderIcon = Icons.Rounded.MusicNote
         )
 
@@ -123,7 +128,7 @@ private fun PlayQueueItem(
 
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = song.title,
+                text = song.song.title,
                 fontSize = 14.sp,
                 fontWeight = if (isActive) FontWeight.Medium else FontWeight.Normal,
                 color = contentColor,
@@ -132,7 +137,7 @@ private fun PlayQueueItem(
             )
             Spacer(modifier = Modifier.height(1.dp))
             Text(
-                text = song.artist.orEmpty(),
+                text = song.song.artist.orEmpty(),
                 fontSize = 12.sp,
                 color = if (isActive) contentColor else MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,

@@ -3,33 +3,35 @@ package com.doro.music.vm
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.doro.music.domain.ScanMusicUseCase
-import com.doro.music.player.ScanResult
+import com.doro.music.player.util.ScanResult
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class MainViewModel(
     private val scanMusicUseCase: ScanMusicUseCase,
 ) : ViewModel() {
 
-    val scanState: StateFlow<ScanState>
-        field = MutableStateFlow<ScanState>(ScanState.Idle)
+    private val _scanState = MutableStateFlow<ScanState>(ScanState.Idle)
+    val scanState: StateFlow<ScanState> = _scanState.asStateFlow()
 
-    val scanEvent: SharedFlow<ScanState>
-        field = MutableSharedFlow<ScanState>()
+    private val _scanEvent = MutableSharedFlow<ScanState>()
+    val scanEvent: SharedFlow<ScanState> = _scanEvent.asSharedFlow()
 
     fun scan() {
         viewModelScope.launch {
-            scanState.emit(ScanState.Scanning)
+            _scanState.emit(ScanState.Scanning)
 
             when (val result = scanMusicUseCase()) {
                 is ScanResult.Success -> ScanState.Done(result.songs.size)
                 is ScanResult.Error -> ScanState.Error
             }.also {
-                scanEvent.emit(it)
-                scanState.emit(ScanState.Idle)
+                _scanEvent.emit(it)
+                _scanState.emit(ScanState.Idle)
             }
         }
     }

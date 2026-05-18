@@ -1,14 +1,17 @@
-package com.doro.music.player
+﻿package com.doro.music.player.util
 
 import android.content.ContentUris
 import android.content.Context
 import android.database.Cursor
+import android.media.MediaScannerConnection
 import android.os.Build
 import android.provider.MediaStore
 import com.doro.music.data.model.Song
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.io.File
+import kotlin.coroutines.resume
 
 sealed class ScanResult {
     data class Success(val songs: List<Song>) : ScanResult()
@@ -24,6 +27,7 @@ class MusicScanner(private val context: Context) {
         excludedFolders: List<String> = emptyList()
     ): ScanResult = withContext(Dispatchers.IO) {
         try {
+            triggerMediaScan()
             val selection = buildSelection(minDurationSeconds)
             val selectionArgs = if (minDurationSeconds > 0)
                 arrayOf(minDurationSeconds.toLong().toString())
@@ -36,6 +40,19 @@ class MusicScanner(private val context: Context) {
             ScanResult.Success(songs)
         } catch (e: Exception) {
             return@withContext ScanResult.Error(e)
+        }
+    }
+
+    private suspend fun triggerMediaScan() = suspendCancellableCoroutine { cont ->
+        val paths = MUSIC_DIRS.map { File(it) }
+            .filter { it.exists() }
+            .flatMap { dir -> dir.listFiles().orEmpty().map { it.absolutePath } }
+        if (paths.isEmpty()) {
+            cont.resume(Unit)
+            return@suspendCancellableCoroutine
+        }
+        MediaScannerConnection.scanFile(context, paths.toTypedArray(), null) { _, _ ->
+            if (cont.isActive) cont.resume(Unit)
         }
     }
 
@@ -96,12 +113,13 @@ class MusicScanner(private val context: Context) {
         private const val SORT_ORDER = MediaStore.Audio.Media.TITLE + " ASC"
         private val EXTERNAL_URI = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
         private const val ALBUM_ART_URI_TEMPLATE = "content://media/external/audio/albumart/%d"
-
-        private const val BASE_SELECTION = """
-            ${MediaStore.Audio.Media.IS_MUSIC} != 0
-            AND ${MediaStore.Audio.Media.SIZE} > 0
-        """
-
+        private val MUSIC_DIRS = listOf(
+            "/storage/emulated/0/Music",
+            "/storage/emulated/0/Download",
+            "/storage/emulated/0/Recordings"
+        )
+        private const val BASE_SELECTION =
+            "(${MediaStore.Audio.Media.IS_MUSIC} = 1 OR ${MediaStore.Audio.Media.IS_MUSIC} IS NULL) AND ${MediaStore.Audio.Media.SIZE} > 0"
         private val PROJECTION = buildList {
             add(MediaStore.Audio.Media._ID)
             add(MediaStore.Audio.Media.TITLE)
@@ -118,7 +136,5 @@ class MusicScanner(private val context: Context) {
                 add(MediaStore.Audio.Media.GENRE)
             }
         }.toTypedArray()
-
-        private val FOLDER_PROJECTION = arrayOf(MediaStore.Audio.Media.DATA)
     }
 }

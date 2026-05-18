@@ -20,7 +20,6 @@ fun PlayerSheetContent(
     playbackState: PlaybackState,
     playMode: PlayMode,
     currentPosition: Long,
-    duration: Long,
     onActionClick: (PlayerAction) -> Unit = {}
 ) {
     if (playbackState == PlaybackState.IDLE) return
@@ -48,7 +47,6 @@ fun PlayerSheetContent(
             playbackState = playbackState,
             playMode = playMode,
             currentPosition = currentPosition,
-            duration = duration,
             onActionClick = onActionClick
         )
     }
