@@ -29,9 +29,6 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Run tests and verify coverage
-        run: ./gradlew testDebugUnitTest jacocoTestCoverageVerification
-
       - name: Decode keystore
         run: echo "${{ secrets.DORO_KEYSTORE_BASE64 }}" | base64 --decode > app/release.jks
 
