@@ -4,25 +4,33 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import com.doro.music.data.model.PlayMode
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.doro.music.data.model.PlaybackState
-import com.doro.music.data.model.PlayerAction
-import com.doro.music.data.model.Song
 import com.doro.music.ui.component.SheetProgressState
+import com.doro.music.vm.PlayerViewModel
 
+/**
+ * 播放器 Sheet 内容
+ *
+ * 自行从 PlayerViewModel 订阅播放器状态，避免上层 MainRoute 因高频状态（如 currentPosition）
+ * 而反复重组。
+ */
 @Composable
 fun PlayerSheetContent(
-    modifier: Modifier = Modifier,
+    vm: PlayerViewModel,
     sheetProgressState: SheetProgressState,
-    playerViewType: PlayerViewType,
-    song: Song? = null,
-    playbackState: PlaybackState,
-    playMode: PlayMode,
-    currentPosition: Long,
-    onActionClick: (PlayerAction) -> Unit = {}
+    modifier: Modifier = Modifier
 ) {
-    if (playbackState == PlaybackState.IDLE) return
+    val playerViewType by vm.playerViewType.collectAsStateWithLifecycle()
+    val uiState by vm.uiState.collectAsStateWithLifecycle()
+    val currentSong by vm.currentSong.collectAsStateWithLifecycle()
+    val currentPosition by vm.currentPosition.collectAsStateWithLifecycle()
+    val currentLyrics by vm.currentLyrics.collectAsStateWithLifecycle()
+    val currentLyricIndex by vm.currentLyricIndex.collectAsStateWithLifecycle()
+
+    if (uiState.playbackState == PlaybackState.IDLE) return
 
     Column(
         modifier = modifier
@@ -32,9 +40,9 @@ fun PlayerSheetContent(
                 .fillMaxWidth()
                 .height(sheetProgressState.peekHeight),
             sheetProgressState = sheetProgressState,
-            onActionClick = onActionClick,
-            song = song,
-            playbackState = playbackState
+            onActionClick = vm::handlePlayerAction,
+            song = currentSong,
+            playbackState = uiState.playbackState
         )
 
         FullPlayer(
@@ -43,11 +51,13 @@ fun PlayerSheetContent(
                 .weight(1f),
             sheetProgressState = sheetProgressState,
             playerViewType = playerViewType,
-            song = song,
-            playbackState = playbackState,
-            playMode = playMode,
+            song = currentSong,
+            playbackState = uiState.playbackState,
+            playMode = uiState.playMode,
             currentPosition = currentPosition,
-            onActionClick = onActionClick
+            lyrics = currentLyrics,
+            lyricIndex = currentLyricIndex,
+            onActionClick = vm::handlePlayerAction
         )
     }
 }

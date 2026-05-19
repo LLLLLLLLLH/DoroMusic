@@ -1,6 +1,7 @@
 package com.doro.music.vm
 
 import androidx.paging.PagingData
+import com.doro.music.data.model.AddSongResult
 import com.doro.music.data.model.Artist
 import com.doro.music.data.model.Playlist
 import com.doro.music.data.model.Song
@@ -19,6 +20,7 @@ import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -73,22 +75,42 @@ class SongListViewModelTest {
     }
 
     @Test
-    fun `setSource with FromArtist updates source state`() = runTest {
+    fun `setSource with FromArtist updates source state and triggers songs flow`() = runTest {
         val artist = Artist(name = "TestArtist", songCount = 5)
         viewModel.setSource(SongListSource.FromArtist(artist))
+        
+        // Collect from songs flow to trigger the flatMapLatest lambda
+        val collectJob = launch { viewModel.songs.collect {} }
         advanceUntilIdle()
 
-        // Verify source was set - the songs flow will react to it
         assertNotNull(viewModel.songs)
+        collectJob.cancel()
     }
 
     @Test
-    fun `setSource with FromPlaylist updates source state`() = runTest {
+    fun `setSource with FromPlaylist updates source state and triggers songs flow`() = runTest {
         val playlist = Playlist(id = 1L, name = "TestPlaylist", songCount = 3)
         viewModel.setSource(SongListSource.FromPlaylist(playlist))
+        
+        // Collect from songs flow to trigger the flatMapLatest lambda
+        val collectJob = launch { viewModel.songs.collect {} }
         advanceUntilIdle()
 
         assertNotNull(viewModel.songs)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `songCount flow is triggered when source is set`() = runTest {
+        val artist = Artist(name = "TestArtist", songCount = 5)
+        viewModel.setSource(SongListSource.FromArtist(artist))
+        
+        // Collect from songCount flow to trigger the flatMapLatest lambda
+        val collectJob = launch { viewModel.songCount.collect {} }
+        advanceUntilIdle()
+
+        assertNotNull(viewModel.songCount)
+        collectJob.cancel()
     }
 
     @Test
@@ -262,9 +284,27 @@ class SongListViewModelTest {
     }
 
     @Test
+    fun `playAll with null source does not dispatch`() = runTest {
+        // Don't set source - source.value is null
+        viewModel.playAll()
+        advanceUntilIdle()
+
+        verify(exactly = 0) { mockDispatcher.dispatch(any()) }
+    }
+
+    @Test
+    fun `shufflePlay with null source does not dispatch`() = runTest {
+        // Don't set source - source.value is null
+        viewModel.shufflePlay()
+        advanceUntilIdle()
+
+        verify(exactly = 0) { mockDispatcher.dispatch(any()) }
+    }
+
+    @Test
     fun `addSongToPlaylist calls use case when song selected`() = runTest {
         viewModel.selectSong(100L)
-        coEvery { mockAddSongToPlaylistUseCase(any(), any()) } returns com.doro.music.data.model.AddSongResult.Success
+        coEvery { mockAddSongToPlaylistUseCase(any(), any()) } returns AddSongResult.Success
 
         viewModel.addSongToPlaylist(setOf(Playlist(id = 1L, name = "P1")))
         advanceUntilIdle()
@@ -290,6 +330,17 @@ class SongListViewModelTest {
         advanceUntilIdle()
 
         coVerify { mockRepo.removeSongFromPlaylist(1L, 100L) }
+    }
+
+    @Test
+    fun `play with null song does not dispatch even when source is set`() = runTest {
+        val artist = Artist(name = "TestArtist", songCount = 1)
+        viewModel.setSource(SongListSource.FromArtist(artist))
+        advanceUntilIdle()
+
+        viewModel.play(null)
+
+        verify(exactly = 0) { mockDispatcher.dispatch(any()) }
     }
 
     @Test

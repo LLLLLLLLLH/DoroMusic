@@ -5,6 +5,7 @@ import com.doro.music.data.datastore.SettingsDataStore
 import com.doro.music.data.db.AppDataBase
 import com.doro.music.data.repo.ArtistRepo
 import com.doro.music.data.repo.FolderRepo
+import com.doro.music.data.repo.LyricsRepo
 import com.doro.music.data.repo.MainRepo
 import com.doro.music.data.repo.PlaylistRepo
 import com.doro.music.data.repo.SearchRepo
@@ -12,6 +13,7 @@ import com.doro.music.data.repo.SettingsRepo
 import com.doro.music.data.repo.SongListRepo
 import com.doro.music.data.repo.SongRepo
 import com.doro.music.domain.AddSongToPlaylistUseCase
+import com.doro.music.domain.GetLyricsUseCase
 import com.doro.music.domain.GetPlaylistsUseCase
 import com.doro.music.domain.GetSongFoldersUseCase
 import com.doro.music.domain.ScanMusicUseCase
@@ -24,6 +26,7 @@ import com.doro.music.data.repo.PlayQueueRepo
 import com.doro.music.data.repo.QueueReadOps
 import com.doro.music.data.repo.QueueWriteOps
 import com.doro.music.player.util.MusicScanner
+import com.doro.music.player.lyrics.LrcFileLoader
 import com.doro.music.data.datastore.PlayStateDataStoreImpl
 import com.doro.music.data.datastore.PlayStateDataStore
 import com.doro.music.vm.ArtistsViewModel
@@ -50,6 +53,7 @@ val databaseModule = module {
         ).fallbackToDestructiveMigration(false)
             .addMigrations(AppDataBase.MIGRATION_8_9)
             .addMigrations(AppDataBase.MIGRATION_9_10)
+            .addMigrations(AppDataBase.MIGRATION_10_11)
             .build()
     }
     single { get<AppDataBase>().songDao() }
@@ -58,6 +62,7 @@ val databaseModule = module {
     single { get<AppDataBase>().artistDao() }
     single { get<AppDataBase>().searchDao() }
     single { get<AppDataBase>().folderDao() }
+    single { get<AppDataBase>().lyricsDao() }
 }
 
 val datastoreModule = module {
@@ -92,6 +97,8 @@ val playerModule = module {
     )
 
     single { MusicScanner(androidContext()) }
+
+    single { LrcFileLoader() }
 }
 
 val repoModule = module {
@@ -103,6 +110,7 @@ val repoModule = module {
     single { SongListRepo(get(), get()) }
     single { SearchRepo(get()) }
     single { SettingsRepo(get()) }
+    single { LyricsRepo(get(), get()) }
 }
 
 val useCaseModule = module {
@@ -110,6 +118,7 @@ val useCaseModule = module {
     factory { AddSongToPlaylistUseCase(get()) }
     factory { GetSongFoldersUseCase(get()) }
     factory { ScanMusicUseCase(get()) }
+    factory { GetLyricsUseCase(get()) }
 }
 
 val viewModelModule = module {
@@ -119,7 +128,7 @@ val viewModelModule = module {
     viewModel { FoldersViewModel(get(), get(), get(), get()) }
     viewModel { MainViewModel(get()) }
     viewModel { SongListViewModel(get(), get(), get(), get()) }
-    viewModel { PlayerViewModel(get(), get(), get()) }
+    viewModel { PlayerViewModel(get(), get(), get(), get()) }
     viewModel { SearchViewModel(get(), get(), get(), get()) }
     viewModel { SettingsViewModel(get(), get(), get(), get()) }
     viewModel { MainActivityViewModel(get(), get()) }
