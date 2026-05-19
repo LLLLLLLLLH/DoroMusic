@@ -30,7 +30,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Decode keystore
-        run: echo "${{ secrets.DORO_KEYSTORE_BASE64 }}" | base64 --decode > app/release.jks
+        run: echo "${{ secrets.DORO_KEYSTORE_BASE64 }}" | base64 --decode > app/doro.jks
 
       - name: Build release APK
         env:
