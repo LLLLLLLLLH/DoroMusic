@@ -12,6 +12,7 @@ import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.ConstraintSet
 import androidx.constraintlayout.compose.Dimension
 import androidx.constraintlayout.compose.layoutId
+import com.doro.music.data.model.LyricsData
 import com.doro.music.data.model.PlayMode
 import com.doro.music.data.model.PlayerAction
 import com.doro.music.data.model.PlaybackState
@@ -79,6 +80,8 @@ fun FullPlayer(
     playbackState: PlaybackState,
     playMode: PlayMode,
     currentPosition: Long,
+    lyrics: LyricsData? = null,
+    lyricIndex: Int = -1,
     onActionClick: (PlayerAction) -> Unit = {}
 ) {
     val isLandscape = rememberIsLandscape()
@@ -102,6 +105,8 @@ fun FullPlayer(
             song = song,
             playbackState = playbackState,
             currentView = playerViewType,
+            lyrics = lyrics,
+            lyricIndex = lyricIndex,
             onActionClick = onActionClick
         )
         PlayerControls(

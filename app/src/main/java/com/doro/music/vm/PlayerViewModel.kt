@@ -1,13 +1,16 @@
-@file:OptIn(ExperimentalCoroutinesApi::class)
+﻿@file:OptIn(ExperimentalCoroutinesApi::class)
 
 package com.doro.music.vm
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.cachedIn
+import com.doro.music.data.model.LyricsData
+import com.doro.music.data.model.LyricsLine
 import com.doro.music.data.model.PlayerAction
 import com.doro.music.data.model.Song
 import com.doro.music.data.repo.SongRepo
+import com.doro.music.domain.GetLyricsUseCase
 import com.doro.music.player.PlayActionDispatcher
 import com.doro.music.player.PlayStateObserver
 import com.doro.music.player.model.PlayAction
@@ -18,6 +21,9 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -33,61 +39,70 @@ import kotlinx.coroutines.launch
 class PlayerViewModel(
     private val stateObserver: PlayStateObserver,
     private val actionDispatcher: PlayActionDispatcher,
-    private val songRepo: SongRepo
+    private val songRepo: SongRepo,
+    private val getLyricsUseCase: GetLyricsUseCase
 ) : ViewModel() {
 
     private companion object {
-        const val TAG = "PlayerViewModel"
+        private const val SUBSCRIPTION_TIMEOUT_MS = 5000L
     }
-
-    // ==================== 核心状态 ====================
 
     val uiState: StateFlow<PlayUiState> = stateObserver.uiState.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000L),
+        started = SharingStarted.WhileSubscribed(SUBSCRIPTION_TIMEOUT_MS),
         initialValue = PlayUiState.Empty
     )
 
-    /** 当前播放位置（高频数据，独立 Flow） */
     val currentPosition: StateFlow<Long> = stateObserver.currentPositionMs.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000L),
+        started = SharingStarted.WhileSubscribed(SUBSCRIPTION_TIMEOUT_MS),
         initialValue = 0L
     )
 
     val currentSong: StateFlow<Song?> = uiState
-        .mapLatest { state -> state.currentSongId?.let { songRepo.getSongById(it) } }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+        .map { state -> state.currentSongId }
+        .distinctUntilChanged()
+        .mapLatest { id -> id?.let { songRepo.getSongById(it) } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIPTION_TIMEOUT_MS), null)
 
-    // ==================== 播放队列 Paging3 ====================
+    val currentLyrics: StateFlow<LyricsData?> = currentSong
+        .mapLatest { song -> song?.let { getLyricsUseCase(it) } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIPTION_TIMEOUT_MS), null)
+
+    val currentLyricIndex: StateFlow<Int> = combine(
+        currentPosition,
+        currentLyrics
+    ) { positionMs, lyrics ->
+        if (lyrics == null) return@combine -1
+        val adjustedPosition = positionMs + lyrics.offset
+        findCurrentLineIndex(lyrics.lines, adjustedPosition)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIPTION_TIMEOUT_MS), -1)
 
     val playQueuePaging = stateObserver.playQueue.cachedIn(viewModelScope)
 
-    // ==================== UI 状态 ====================
-
-    val playerViewType: MutableStateFlow<PlayerViewType> = MutableStateFlow(PlayerViewType.DISC)
-    val playerSheetState: MutableStateFlow<PlayerSheetState> = MutableStateFlow(PlayerSheetState.Hidden)
-    val isQueueVisible: MutableStateFlow<Boolean> = MutableStateFlow(false)
+    val playerViewType: StateFlow<PlayerViewType>
+        field = MutableStateFlow<PlayerViewType>(PlayerViewType.DISC)
+    val playerSheetState: StateFlow<PlayerSheetState>
+        field = MutableStateFlow<PlayerSheetState>(PlayerSheetState.Hidden)
+    val isQueueVisible: StateFlow<Boolean>
+        field = MutableStateFlow<Boolean>(false)
 
     init {
         // 监听播放状态，自动控制 playerSheetState
         viewModelScope.launch {
-            uiState.collect { state ->
-                if (state.currentQueueId == null) {
-                    playerSheetState.value = PlayerSheetState.Hidden
-                    isQueueVisible.value = false
-                } else if (playerSheetState.value == PlayerSheetState.Hidden) {
-                    playerSheetState.value = PlayerSheetState.Collapsed
+            uiState.map { it.currentQueueId }
+                .distinctUntilChanged()
+                .collect { queueId ->
+                    if (queueId == null) {
+                        playerSheetState.value = PlayerSheetState.Hidden
+                        isQueueVisible.value = false
+                    } else if (playerSheetState.value == PlayerSheetState.Hidden) {
+                        playerSheetState.value = PlayerSheetState.Collapsed
+                    }
                 }
-            }
         }
     }
 
-    // ==================== 播放操作 ====================
-
-    /**
-     * 处理 UI 层的 PlayerAction
-     */
     fun handlePlayerAction(action: PlayerAction) {
         when (action) {
             is PlayerAction.TogglePlayPause -> actionDispatcher.dispatch(PlayAction.TogglePlay)
@@ -119,7 +134,17 @@ class PlayerViewModel(
         actionDispatcher.dispatch(PlayAction.SeekToQueueItem(queueId))
     }
 
-    // ==================== UI 辅助方法 ====================
+    fun restorePlayerView() {
+        playerViewType.value = PlayerViewType.DISC
+    }
+
+    fun syncSheetState(state: PlayerSheetState) {
+        playerSheetState.value = state
+    }
+
+    fun syncQueueVisible(visible: Boolean) {
+        isQueueVisible.value = visible
+    }
 
     private fun togglePlayerView() {
         playerViewType.value = when (playerViewType.value) {
@@ -152,5 +177,11 @@ class PlayerViewModel(
 
             else -> false
         }
+    }
+
+    private fun findCurrentLineIndex(lines: List<LyricsLine>, position: Long): Int {
+        if (lines.isEmpty()) return -1
+        val result = lines.binarySearch { it.timeMs.compareTo(position) }
+        return if (result >= 0) result else -result - 2
     }
 }

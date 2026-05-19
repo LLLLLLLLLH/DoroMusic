@@ -4,12 +4,12 @@ import android.os.SystemClock
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
+import com.doro.music.data.model.LyricsData
 import com.doro.music.data.model.PlaybackState
 import com.doro.music.data.model.PlayerAction
 import com.doro.music.data.model.Song
@@ -22,6 +22,8 @@ fun PlayerDisplay(
     song: Song? = null,
     playbackState: PlaybackState,
     currentView: PlayerViewType,
+    lyrics: LyricsData? = null,
+    lyricIndex: Int = -1,
     onActionClick: (PlayerAction) -> Unit
 ) {
     val isLandscape = rememberIsLandscape()
@@ -52,7 +54,13 @@ fun PlayerDisplay(
                         )
                     }
 
-                PlayerViewType.LYRIC -> Box { Text(text = "Not Found Lyric") }
+                PlayerViewType.LYRIC -> LyricsView(
+                    lyrics = lyrics,
+                    currentIndex = lyricIndex,
+                    onSeekToLine = { timeMs ->
+                        onActionClick(PlayerAction.SeekTo(timeMs))
+                    }
+                )
             }
         }
     }
