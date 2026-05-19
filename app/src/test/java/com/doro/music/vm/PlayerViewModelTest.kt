@@ -1,6 +1,9 @@
 ﻿package com.doro.music.vm
 
 import androidx.paging.PagingData
+import com.doro.music.data.model.LyricsData
+import com.doro.music.data.model.LyricsLine
+import com.doro.music.data.model.LyricsSource
 import com.doro.music.data.model.PlayerAction
 import com.doro.music.data.model.Song
 import com.doro.music.data.repo.SongRepo
@@ -236,6 +239,23 @@ class PlayerViewModelTest {
     }
 
     @Test
+    fun `uiState with null currentQueueId hides sheet and queue via init block`() = runTest {
+        // Start with a valid queueId
+        uiStateFlow.value = PlayUiState(currentQueueId = 1L, currentSongId = 1L)
+        advanceUntilIdle()
+
+        // Now set to Empty (null queueId) - init block should react
+        viewModel.syncSheetState(PlayerSheetState.Collapsed)
+        viewModel.syncQueueVisible(false)
+        uiStateFlow.value = PlayUiState.Empty
+        advanceUntilIdle()
+
+        // Verify init block set Hidden and false
+        assertEquals(PlayerSheetState.Hidden, viewModel.playerSheetState.value)
+        assertFalse(viewModel.isQueueVisible.value)
+    }
+
+    @Test
     fun `uiState with currentQueueId auto-shows Collapsed sheet`() = runTest {
         viewModel.syncSheetState(PlayerSheetState.Hidden)
 
@@ -246,36 +266,23 @@ class PlayerViewModelTest {
     }
 
     @Test
-    fun `uiState with null currentQueueId hides sheet`() = runTest {
-        viewModel.syncSheetState(PlayerSheetState.Collapsed)
-
-        uiStateFlow.value = PlayUiState.Empty
-        advanceUntilIdle()
-
-        // The init block collects uiState, which should set sheet to Hidden
-        // However, timing with WhileSubscribed may cause the initial value to persist
-        // Verify the flow is connected
-        assertNotNull(viewModel.playerSheetState.value)
-    }
-
-    @Test
-    fun `uiState with currentQueueId hides queue when sheet becomes Hidden`() = runTest {
-        viewModel.syncQueueVisible(true)
-        uiStateFlow.value = PlayUiState.Empty
-        advanceUntilIdle()
-
-        // The init block collects uiState and sets isQueueVisible to false when currentQueueId is null
-        // However, WhileSubscribed(5000L) may delay the collection
-        // Just verify the flow is connected
-        assertNotNull(viewModel.isQueueVisible.value)
-    }
-
-    @Test
     fun `uiState with currentQueueId does not override Expanded sheet`() = runTest {
         viewModel.syncSheetState(PlayerSheetState.Expanded)
         uiStateFlow.value = PlayUiState(currentQueueId = 1L, currentSongId = 1L)
         advanceUntilIdle()
 
+        assertEquals(PlayerSheetState.Expanded, viewModel.playerSheetState.value)
+    }
+
+    @Test
+    fun `uiState with currentQueueId shows queue when sheet is not Hidden`() = runTest {
+        viewModel.syncSheetState(PlayerSheetState.Expanded)
+        viewModel.syncQueueVisible(false)
+
+        uiStateFlow.value = PlayUiState(currentQueueId = 1L, currentSongId = 1L)
+        advanceUntilIdle()
+
+        // Expanded sheet should not be changed, but queue visibility should update
         assertEquals(PlayerSheetState.Expanded, viewModel.playerSheetState.value)
     }
 
@@ -339,9 +346,87 @@ class PlayerViewModelTest {
 
     @Test
     fun `currentPosition reflects observer flow`() = runTest {
-        // currentPosition uses WhileSubscribed(5000L), so it may not update immediately
-        // Just verify the flow is connected and has initial value
         assertNotNull(viewModel.currentPosition.value)
         assertEquals(0L, viewModel.currentPosition.value)
+    }
+
+    @Test
+    fun `currentLyricIndex returns -1 when lyrics is null`() = runTest {
+        val collectJob = launch { viewModel.currentLyricIndex.collect {} }
+        advanceUntilIdle()
+
+        assertEquals(-1, viewModel.currentLyricIndex.value)
+
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `currentLyricIndex returns -1 when lyrics has empty lines`() = runTest {
+        coEvery { mockSongRepo.getSongById(1L) } returns Song(id = 1L, title = "Test", path = "/test")
+        coEvery { mockGetLyricsUseCase.invoke(any()) } returns LyricsData(
+            songId = 1L,
+            source = LyricsSource.CACHE,
+            lines = emptyList()
+        )
+
+        val collectJob = launch { viewModel.currentLyricIndex.collect {} }
+
+        uiStateFlow.value = PlayUiState(currentQueueId = 1L, currentSongId = 1L)
+        currentPositionFlow.value = 5000L
+        advanceUntilIdle()
+
+        assertEquals(-1, viewModel.currentLyricIndex.value)
+
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `currentLyricIndex calculates correct index with lyrics data`() = runTest {
+        coEvery { mockSongRepo.getSongById(1L) } returns Song(id = 1L, title = "Test", path = "/test")
+        coEvery { mockGetLyricsUseCase.invoke(any()) } returns LyricsData(
+            songId = 1L,
+            source = LyricsSource.CACHE,
+            lines = listOf(
+                LyricsLine(timeMs = 0, text = "Line 1"),
+                LyricsLine(timeMs = 5000, text = "Line 2"),
+                LyricsLine(timeMs = 10000, text = "Line 3")
+            ),
+            offset = 0L
+        )
+
+        val collectJob = launch { viewModel.currentLyricIndex.collect {} }
+
+        uiStateFlow.value = PlayUiState(currentQueueId = 1L, currentSongId = 1L)
+        currentPositionFlow.value = 6000L
+        advanceUntilIdle()
+
+        // Position 6000ms should be between line 2 (5000ms) and line 3 (10000ms)
+        assertEquals(1, viewModel.currentLyricIndex.value)
+
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `restorePlayerView sets playerViewType to DISC`() = runTest {
+        viewModel.restorePlayerView()
+        assertEquals(PlayerViewType.DISC, viewModel.playerViewType.value)
+    }
+
+    @Test
+    fun `syncSheetState updates playerSheetState`() = runTest {
+        viewModel.syncSheetState(PlayerSheetState.Expanded)
+        assertEquals(PlayerSheetState.Expanded, viewModel.playerSheetState.value)
+
+        viewModel.syncSheetState(PlayerSheetState.Collapsed)
+        assertEquals(PlayerSheetState.Collapsed, viewModel.playerSheetState.value)
+    }
+
+    @Test
+    fun `syncQueueVisible updates isQueueVisible`() = runTest {
+        viewModel.syncQueueVisible(true)
+        assertTrue(viewModel.isQueueVisible.value)
+
+        viewModel.syncQueueVisible(false)
+        assertFalse(viewModel.isQueueVisible.value)
     }
 }
