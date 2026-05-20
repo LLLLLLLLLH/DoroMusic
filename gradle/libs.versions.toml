@@ -28,6 +28,7 @@ datastore = "1.2.1"
 constraintlayout = "1.1.1"
 jacoco = "0.8.13"
 workmanager = "2.10.0"
+splashscreen = "1.2.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -70,6 +71,7 @@ media3-ui-compose-material3 = { module = "androidx.media3:media3-ui-compose-mate
 datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
 constraintlayout_compose = { module = "androidx.constraintlayout:constraintlayout-compose",version.ref = "constraintlayout" }
 workmanager = { module = "androidx.work:work-runtime-ktx", version.ref = "workmanager" }
+androidx-splashscreen = { module = "androidx.core:core-splashscreen", version.ref = "splashscreen" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -122,6 +122,7 @@ dependencies {
     implementation(libs.media3.ui.compose.material3)
     implementation(libs.datastore.preferences)
     implementation(libs.constraintlayout.compose)
+    implementation(libs.androidx.splashscreen)
 }
 
 tasks.register<JacocoReport>("jacocoTestReport") {

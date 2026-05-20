@@ -47,7 +47,7 @@
             android:name=".ui.MainActivity"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|layoutDirection|locale"
             android:exported="true"
-            android:theme="@style/Theme.DoroMusic">
+            android:theme="@style/Theme.DoroMusic.Splash">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
