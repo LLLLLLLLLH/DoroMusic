@@ -22,6 +22,8 @@ fun QueueSong.toMediaItem(): MediaItem {
             MediaMetadata.Builder()
                 .setTitle(song.title)
                 .setArtist(song.artist)
+                .setAlbumTitle(song.album)
+                .setArtworkUri(song.albumArt?.toUri())
                 .build()
         )
         .build()

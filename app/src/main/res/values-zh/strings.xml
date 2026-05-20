@@ -98,4 +98,5 @@
     <string name="dark_theme_light">浅色</string>
     <string name="dark_theme_dark">深色</string>
     <string name="github_url">https://github.com/DoroWolf/DoroMusic</string>
+    <string name="notification_channel_playback">音乐播放</string>
 </resources>
