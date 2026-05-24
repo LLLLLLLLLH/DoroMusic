@@ -24,7 +24,7 @@ fun SongListContent(
     songs: LazyPagingItems<Song>,
     playlists: LazyPagingItems<Playlist>,
     songCount: Int,
-    selectedSong: Long?,
+    selectedSongId: Long?,
     displayMode: DisplayMode,
     sortMode: SortMode,
     snackbarHostState: SnackbarHostState,
@@ -41,7 +41,7 @@ fun SongListContent(
 ) {
     PlaylistSelectDialog(
         items = playlists,
-        show = selectedSong != null,
+        show = selectedSongId != null,
         onDismiss = { onSelectSong(null) },
         onConfirm = onAddSongToPlaylist
     )

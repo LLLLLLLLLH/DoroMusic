@@ -79,7 +79,7 @@ private fun SongListScreen(
     val songs = vm.songs.collectAsLazyPagingItems()
     val playlist = vm.playlist.collectAsLazyPagingItems()
     val songCount by vm.songCount.collectAsStateWithLifecycle()
-    val selectedSong by vm.selectedSong.collectAsStateWithLifecycle()
+    val selectedSongId by vm.selectedSongId.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(source) {
@@ -120,7 +120,7 @@ private fun SongListScreen(
             songs = songs,
             playlists = playlist,
             songCount = songCount,
-            selectedSong = selectedSong,
+            selectedSongId = selectedSongId,
             displayMode = displayMode,
             sortMode = sortBy,
             snackbarHostState = snackbarHostState,

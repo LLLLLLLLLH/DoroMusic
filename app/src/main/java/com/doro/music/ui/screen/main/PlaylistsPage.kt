@@ -31,7 +31,6 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import com.doro.music.R
 import com.doro.music.data.model.DisplayMode
 import com.doro.music.data.model.Playlist
-import com.doro.music.data.model.Song
 import com.doro.music.data.model.SortMode
 import com.doro.music.ui.component.DisplayItem
 import com.doro.music.ui.component.DisplayList
@@ -62,17 +61,7 @@ fun PlaylistsPage(
         }
     }
 
-    HandleDialog(
-        state = dialogState,
-        onCreateConfirm = vm::createPlaylist,
-        onDeleteConfirm = vm::deletePlaylist,
-        checkDuplicateName = vm::checkDuplicateName,
-        onDismiss = vm::dismissDialog
-    )
-
-    PlaylistContent(
-        modifier = Modifier.fillMaxSize(),
-        vm = vm,
+    PlaylistsPageContent(
         playlists = playlists,
         playlistCount = playlistCount,
         sortMode = sortMode,
@@ -81,14 +70,22 @@ fun PlaylistsPage(
         onAddPlaylist = vm::showCreatePlaylist,
         onDeletePlaylist = vm::showDeletePlaylist,
         onPlaylistClick = onPlaylistClick,
-        onAddToNext = vm::addToNext
+        onAddToNext = vm::addToNext,
+        onSortChange = vm::setSortBy,
+        onDisplayModeChange = vm::setDisplayMode
+    )
+
+    HandleDialog(
+        state = dialogState,
+        onCreateConfirm = vm::createPlaylist,
+        onDeleteConfirm = vm::deletePlaylist,
+        checkDuplicateName = vm::checkDuplicateName,
+        onDismiss = vm::dismissDialog
     )
 }
 
 @Composable
-private fun PlaylistContent(
-    modifier: Modifier = Modifier,
-    vm: PlaylistsViewModel,
+private fun PlaylistsPageContent(
     playlists: LazyPagingItems<Playlist>,
     playlistCount: Int,
     sortMode: SortMode,
@@ -97,10 +94,12 @@ private fun PlaylistContent(
     onAddPlaylist: () -> Unit,
     onDeletePlaylist: (Long) -> Unit,
     onPlaylistClick: (Playlist) -> Unit,
-    onAddToNext: (Long) -> Unit
+    onAddToNext: (Long) -> Unit,
+    onSortChange: (SortMode) -> Unit,
+    onDisplayModeChange: (DisplayMode) -> Unit
 ) {
     DisplayList(
-        modifier = modifier,
+        modifier = Modifier.fillMaxSize(),
         mode = displayMode,
         items = playlists,
         snackbarHostState = snackbarHostState,
@@ -118,8 +117,8 @@ private fun PlaylistContent(
                     sortOptions = listOf(SortMode.TITLE, SortMode.DATE_ADDED),
                     sortBy = sortMode,
                     displayMode = displayMode,
-                    onSortChange = vm::setSortBy,
-                    onDisplayModeChange = vm::setDisplayMode,
+                    onSortChange = onSortChange,
+                    onDisplayModeChange = onDisplayModeChange,
                 )
             }
         }

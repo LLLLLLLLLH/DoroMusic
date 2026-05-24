@@ -84,32 +84,11 @@ private fun SearchScreen(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         modifier = Modifier.fillMaxSize(),
         topBar = {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .statusBarsPadding(), verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(imageVector = Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
-                }
-                TextField(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(end = 10.dp),
-                    value = keyword,
-                    onValueChange = vm::searchSongs,
-                    singleLine = true,
-                    placeholder = { Text(text = stringResource(R.string.search_hint), color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        disabledContainerColor = Color.Transparent,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent,
-                        disabledIndicatorColor = Color.Transparent,
-                    )
-                )
-            }
+            SearchTopBar(
+                keyword = keyword,
+                onKeywordChange = vm::searchSongs,
+                onBack = onBack
+            )
         }
     ) { paddingValues ->
         SongListContent(
@@ -117,7 +96,7 @@ private fun SearchScreen(
             songs = songs,
             playlists = playlists,
             songCount = songCount,
-            selectedSong = selectedSong,
+            selectedSongId = selectedSong,
             displayMode = displayMode,
             sortMode = sortMode,
             snackbarHostState = snackbarHostState,
@@ -133,6 +112,47 @@ private fun SearchScreen(
             extraMenuItem = { song ->
                 Option(onClick = { vm.selectSong(song.id) }) { Text(stringResource(R.string.add_to_playlist)) }
             }
+        )
+    }
+}
+
+@Composable
+private fun SearchTopBar(
+    modifier: Modifier = Modifier,
+    keyword: String,
+    onKeywordChange: (String) -> Unit,
+    onBack: () -> Unit
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .statusBarsPadding(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onBack) {
+            Icon(imageVector = Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
+        }
+        TextField(
+            modifier = Modifier
+                .weight(1f)
+                .padding(end = 10.dp),
+            value = keyword,
+            onValueChange = onKeywordChange,
+            singleLine = true,
+            placeholder = {
+                Text(
+                    text = stringResource(R.string.search_hint),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = Color.Transparent,
+                unfocusedContainerColor = Color.Transparent,
+                disabledContainerColor = Color.Transparent,
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
+                disabledIndicatorColor = Color.Transparent,
+            )
         )
     }
 }

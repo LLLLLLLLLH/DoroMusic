@@ -30,7 +30,7 @@ fun SongsPage(
     val songCount by vm.songCount.collectAsStateWithLifecycle()
     val sortMode by vm.sortMode.collectAsStateWithLifecycle()
     val displayMode by vm.displayMode.collectAsStateWithLifecycle()
-    val selectedSong by vm.selectedSong.collectAsStateWithLifecycle()
+    val selectedSongId by vm.selectedSongId.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(Unit) {
@@ -43,16 +43,16 @@ fun SongsPage(
         songs = songs,
         playlists = playlist,
         songCount = songCount,
-        selectedSong = selectedSong,
+        selectedSongId = selectedSongId,
         displayMode = displayMode,
         sortMode = sortMode,
         snackbarHostState = snackbarHostState,
         onSelectSong = vm::selectSong,
         onAddSongToPlaylist = vm::addSongToPlaylist,
         onAddToNext = vm::addToNext,
-        onSongClick = { vm.play(song = it) },
-        onPlayAll = { vm.playAll() },
-        onShufflePlay = { vm.shufflePlay() },
+        onSongClick = vm::play,
+        onPlayAll = vm::playAll,
+        onShufflePlay = vm::shufflePlay,
         onSortChange = vm::setSortBy,
         onDisplayModeChange = vm::setDisplayMode,
         onDetailClick = onDetailClick,
