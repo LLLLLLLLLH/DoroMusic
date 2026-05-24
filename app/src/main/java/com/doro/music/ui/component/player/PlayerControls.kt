@@ -26,15 +26,32 @@ import com.doro.music.data.model.PlayerAction
 import com.doro.music.data.model.Song
 import com.doro.music.ui.component.IconAction
 
+private object PlayerControlsLayoutIds {
+    const val ARTIST = "artist"
+    const val TITLE = "title"
+    const val SLIDER = "slider"
+    const val PLAY_MODE_BUTTON = "playModeButton"
+    const val PREV_BUTTON = "prevButton"
+    const val PLAY_PAUSE_BUTTON = "playPauseButton"
+    const val NEXT_BUTTON = "nextButton"
+    const val PLAYLIST_BUTTON = "playlistButton"
+}
+
 private fun ConstraintSetScope.createPlayerControlRefIds() =
     createRefsFor(
-        "artist", "title", "slider",
-        "playModeButton", "prevButton", "playPauseButton",
-        "nextButton", "playlistButton"
+        PlayerControlsLayoutIds.ARTIST,
+        PlayerControlsLayoutIds.TITLE,
+        PlayerControlsLayoutIds.SLIDER,
+        PlayerControlsLayoutIds.PLAY_MODE_BUTTON,
+        PlayerControlsLayoutIds.PREV_BUTTON,
+        PlayerControlsLayoutIds.PLAY_PAUSE_BUTTON,
+        PlayerControlsLayoutIds.NEXT_BUTTON,
+        PlayerControlsLayoutIds.PLAYLIST_BUTTON
     )
 
 private val PortraitConstraints = ConstraintSet {
-    val (artist, title, slider, playModeButton, prevButton, playPauseButton, nextButton, playlistButton) = createPlayerControlRefIds()
+    val (artist, title, slider, playModeButton,
+        prevButton, playPauseButton, nextButton, playlistButton) = createPlayerControlRefIds()
 
     val guideBottom = createGuidelineFromBottom(0.1F)
 
@@ -158,47 +175,47 @@ fun PlayerControls(
     ) {
         Text(
             text = song?.artist.orEmpty(),
-            modifier = Modifier.layoutId("artist")
+            modifier = Modifier.layoutId(PlayerControlsLayoutIds.ARTIST)
         )
         Text(
             text = song?.title.orEmpty(),
-            modifier = Modifier.layoutId("title")
+            modifier = Modifier.layoutId(PlayerControlsLayoutIds.TITLE)
         )
         PlayerSlider(
             position = currentPosition,
             duration = song?.duration ?: 0L,
             onSeek = { onActionClick(PlayerAction.SeekTo(it)) },
-            modifier = Modifier.layoutId("slider")
+            modifier = Modifier.layoutId(PlayerControlsLayoutIds.SLIDER)
         )
         IconAction(
             imageVector = playModeIcon,
             contentDescription = playModeIcon.name,
             onClick = { onActionClick(PlayerAction.TogglePlayMode) },
-            modifier = Modifier.layoutId("playModeButton")
+            modifier = Modifier.layoutId(PlayerControlsLayoutIds.PLAY_MODE_BUTTON)
         )
         IconAction(
             imageVector = Icons.Rounded.SkipPrevious,
             contentDescription = Icons.Rounded.SkipPrevious.name,
             onClick = { onActionClick(PlayerAction.Previous) },
-            modifier = Modifier.layoutId("prevButton")
+            modifier = Modifier.layoutId(PlayerControlsLayoutIds.PREV_BUTTON)
         )
         IconAction(
             imageVector = playbackIcon,
             contentDescription = playbackIcon.name,
             onClick = { onActionClick(PlayerAction.TogglePlayPause) },
-            modifier = Modifier.layoutId("playPauseButton")
+            modifier = Modifier.layoutId(PlayerControlsLayoutIds.PLAY_PAUSE_BUTTON)
         )
         IconAction(
             imageVector = Icons.Rounded.SkipNext,
             contentDescription = Icons.Rounded.SkipNext.name,
             onClick = { onActionClick(PlayerAction.Next) },
-            modifier = Modifier.layoutId("nextButton")
+            modifier = Modifier.layoutId(PlayerControlsLayoutIds.NEXT_BUTTON)
         )
         IconAction(
             imageVector = Icons.AutoMirrored.Rounded.PlaylistPlay,
             contentDescription = Icons.AutoMirrored.Rounded.PlaylistPlay.name,
             onClick = { onActionClick(PlayerAction.TogglePlayQueue) },
-            modifier = Modifier.layoutId("playlistButton")
+            modifier = Modifier.layoutId(PlayerControlsLayoutIds.PLAYLIST_BUTTON)
         )
     }
 }

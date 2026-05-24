@@ -16,7 +16,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -29,10 +28,12 @@ import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
+import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.doro.music.R
 import com.doro.music.data.model.DisplayMode
 import com.doro.music.data.model.Folder
+import com.doro.music.data.model.Playlist
 import com.doro.music.data.model.Song
 import com.doro.music.ui.component.DisplayItem
 import com.doro.music.ui.component.DisplayList
@@ -69,12 +70,12 @@ fun FoldersPage(
                     onFolderClick = { path -> backStack.add(FolderSongs(path)) }
                 )
             }
-            entry<FolderSongs> {
-                FolderSongsView(
+            entry<FolderSongs> { key ->
+                FolderSongsRoute(
                     vm = vm,
-                    folderPath = it.folderPath,
+                    folderPath = key.folderPath,
                     onDetailClick = onDetailClick,
-                    onBack = { backStack.remove(it) }
+                    onBack = { backStack.remove(key) }
                 )
             }
         }
@@ -109,7 +110,7 @@ private fun FolderListView(
 
 @SuppressLint("LocalContextGetResourceValueCall")
 @Composable
-private fun FolderSongsView(
+private fun FolderSongsRoute(
     vm: FoldersViewModel,
     folderPath: String,
     onDetailClick: (Song) -> Unit,
@@ -118,7 +119,7 @@ private fun FolderSongsView(
     val context = LocalContext.current
     val songs = vm.songs.collectAsLazyPagingItems()
     val playlist = vm.playlist.collectAsLazyPagingItems()
-    val selectedSong by vm.selectedSong.collectAsStateWithLifecycle()
+    val selectedSongId by vm.selectedSongId.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(folderPath) {
@@ -131,11 +132,38 @@ private fun FolderSongsView(
         }
     }
 
+    FolderSongsView(
+        songs = songs,
+        playlist = playlist,
+        selectedSongId = selectedSongId,
+        snackbarHostState = snackbarHostState,
+        onAddToNext = vm::addToNext,
+        onAddSongToPlaylist = vm::addSongToPlaylist,
+        onSelectSong = vm::selectSong,
+        onPlayFolderSongs = { song -> vm.playFolderSongs(folderPath, song) },
+        onDetailClick = onDetailClick,
+        onBack = onBack
+    )
+}
+
+@Composable
+private fun FolderSongsView(
+    songs: LazyPagingItems<Song>,
+    playlist: LazyPagingItems<Playlist>,
+    selectedSongId: Long?,
+    snackbarHostState: SnackbarHostState,
+    onAddToNext: (Song) -> Unit,
+    onAddSongToPlaylist: (Set<Playlist>) -> Unit,
+    onSelectSong: (Long?) -> Unit,
+    onPlayFolderSongs: (Song) -> Unit,
+    onDetailClick: (Song) -> Unit,
+    onBack: () -> Unit
+) {
     PlaylistSelectDialog(
-        show = selectedSong != null,
+        show = selectedSongId != null,
         items = playlist,
-        onConfirm = vm::addSongToPlaylist,
-        onDismiss = { vm.selectSong(null) }
+        onConfirm = onAddSongToPlaylist,
+        onDismiss = { onSelectSong(null) }
     )
 
     DisplayList(
@@ -159,13 +187,11 @@ private fun FolderSongsView(
             subtitle = song.artist ?: stringResource(R.string.unknown_artist),
             albumArt = song.albumArt,
             menu = {
-                Option(onClick = { vm.addToNext(song) }) { Text(text = stringResource(R.string.add_to_next)) }
-                Option(onClick = { vm.selectSong(song.id) }) { Text(text = stringResource(R.string.add_to_playlist)) }
+                Option(onClick = { onAddToNext(song) }) { Text(text = stringResource(R.string.add_to_next)) }
+                Option(onClick = { onSelectSong(song.id) }) { Text(text = stringResource(R.string.add_to_playlist)) }
                 Option(onClick = { onDetailClick(song) }) { Text(text = stringResource(R.string.details)) }
             },
-            onClick = {
-                vm.playFolderSongs(folderPath, song)
-            }
+            onClick = { onPlayFolderSongs(song) }
         )
     }
 }

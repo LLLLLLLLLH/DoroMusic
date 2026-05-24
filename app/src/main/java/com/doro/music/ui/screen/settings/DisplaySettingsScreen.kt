@@ -35,17 +35,31 @@ import org.koin.compose.viewmodel.koinViewModel
 
 internal fun EntryProviderScope<NavKey>.displaySettingsEntry(onBack: () -> Unit) {
     entry<SettingsNavKey.Display> {
-        DisplaySettingsScreen(onBack = onBack)
+        DisplaySettingsRoute(onBack = onBack)
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DisplaySettingsScreen(
+fun DisplaySettingsRoute(
     vm: SettingsViewModel = koinViewModel(),
     onBack: () -> Unit
 ) {
     val settings by vm.settings.collectAsStateWithLifecycle()
+
+    DisplaySettingsScreen(
+        darkTheme = settings.darkTheme,
+        onDarkThemeChange = vm::setDarkTheme,
+        onBack = onBack
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DisplaySettingsScreen(
+    darkTheme: DarkThemeMode,
+    onDarkThemeChange: (DarkThemeMode) -> Unit,
+    onBack: () -> Unit
+) {
     var expanded by remember { mutableStateOf(false) }
 
     SettingsScaffold(
@@ -67,7 +81,7 @@ fun DisplaySettingsScreen(
                         .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
                         .fillMaxWidth(),
                     headlineContent = { Text(stringResource(R.string.dark_theme)) },
-                    supportingContent = { Text(settings.darkTheme.toDisplayName()) },
+                    supportingContent = { Text(darkTheme.toDisplayName()) },
                     trailingContent = {
                         ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
                     }
@@ -80,11 +94,11 @@ fun DisplaySettingsScreen(
                         DropdownMenuItem(
                             text = { Text(mode.toDisplayName()) },
                             onClick = {
-                                vm.setDarkTheme(mode)
+                                onDarkThemeChange(mode)
                                 expanded = false
                             },
                             trailingIcon = {
-                                if (mode == settings.darkTheme) {
+                                if (mode == darkTheme) {
                                     Icon(
                                         imageVector = Icons.Rounded.Check,
                                         contentDescription = null,
@@ -108,4 +122,3 @@ private fun DarkThemeMode.toDisplayName(): String = stringResource(
         DarkThemeMode.DARK -> R.string.dark_theme_dark
     }
 )
-

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -22,9 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
@@ -50,54 +49,85 @@ fun PlayerSlider(
     duration: Long,
     onSeek: (Long) -> Unit = {}
 ) {
-    val progress = if (duration > 0) (position.toDouble() / duration).toFloat() else 0f
-    var isInteracting by remember { mutableStateOf(false) }
-    val density = LocalDensity.current
+    val progress by remember(position, duration) {
+        derivedStateOf { if (duration > 0) position.toFloat() / duration else 0f }
+    }
 
-    val trackHeight = if (isInteracting) PlayerSliderDefaults.TRACK_HEIGHT_ACTIVE else PlayerSliderDefaults.TRACK_HEIGHT_INACTIVE
-    val thumbRadius = if (isInteracting) PlayerSliderDefaults.THUMB_RADIUS_ACTIVE else PlayerSliderDefaults.THUMB_RADIUS_INACTIVE
+    var isInteracting by remember { mutableStateOf(false) }
+
     val activeColor = MaterialTheme.colorScheme.primary
     val inactiveColor = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = PlayerSliderDefaults.INACTIVE_TRACK_ALPHA)
+    val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val labelStyle = MaterialTheme.typography.bodySmall
 
-    val trackPx = remember(density, isInteracting) { with(density) { trackHeight.toPx() } }
-    val thumbPx = remember(density, isInteracting) { with(density) { thumbRadius.toPx() } }
+    val posLabel = remember(position) { position.formatDuration() }
+    val durLabel = remember(duration) { duration.formatDuration() }
 
-    val seekTo = remember(onSeek, duration) { { x: Float, width: Int ->
-        val p = (x / width).coerceIn(0f, 1f)
-        onSeek((p * duration).toLong())
-    }}
-
-    Column(modifier = modifier.padding(horizontal = PlayerSliderDefaults.HORIZONTAL_PADDING, vertical = PlayerSliderDefaults.VERTICAL_PADDING)) {
+    Column(
+        modifier = modifier.padding(
+            horizontal = PlayerSliderDefaults.HORIZONTAL_PADDING,
+            vertical = PlayerSliderDefaults.VERTICAL_PADDING
+        )
+    ) {
         Canvas(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(PlayerSliderDefaults.TOUCH_AREA_HEIGHT)
-                .pointerInput(Unit) {
+                .pointerInput(duration, onSeek) { // 将 Key 传入，确保回调正确
                     awaitEachGesture {
                         val down = awaitFirstDown()
-                        down.consume()
-                        seekTo(down.position.x, size.width)
                         isInteracting = true
+
+                        // 封装 seek 逻辑
+                        fun doSeek(x: Float) {
+                            val p = (x / size.width).coerceIn(0f, 1f)
+                            onSeek((p * duration).toLong())
+                        }
+
+                        doSeek(down.position.x)
                         drag(down.id) { change ->
-                            val x = change.position.x.coerceIn(0f, size.width.toFloat())
-                            seekTo(x, size.width)
+                            doSeek(change.position.x)
                             change.consume()
                         }
                         isInteracting = false
                     }
                 }
         ) {
+            val trackHeight = if (isInteracting) PlayerSliderDefaults.TRACK_HEIGHT_ACTIVE else PlayerSliderDefaults.TRACK_HEIGHT_INACTIVE
+            val thumbRadius = if (isInteracting) PlayerSliderDefaults.THUMB_RADIUS_ACTIVE else PlayerSliderDefaults.THUMB_RADIUS_INACTIVE
+
+            val trackPx = trackHeight.toPx()
+            val thumbPx = thumbRadius.toPx()
+
             val cy = size.height / 2
             val y = cy - trackPx / 2
+            val currentProgressWidth = size.width * progress
 
-            drawRoundRect(inactiveColor, Offset(0f, y), Size(size.width, trackPx), CornerRadius(trackPx / 2))
-            drawRoundRect(activeColor, Offset(0f, y), Size(size.width * progress, trackPx), CornerRadius(trackPx / 2))
-            drawCircle(activeColor, thumbPx, Offset(size.width * progress, cy))
+            drawRoundRect(
+                color = inactiveColor,
+                topLeft = Offset(0f, y),
+                size = Size(size.width, trackPx),
+                cornerRadius = CornerRadius(trackPx / 2),
+            )
+            drawRoundRect(
+                color = activeColor,
+                topLeft = Offset(0f, y),
+                size = Size(currentProgressWidth, trackPx),
+                cornerRadius = CornerRadius(trackPx / 2),
+            )
+            drawCircle(
+                color = activeColor,
+                radius = thumbPx,
+                center = Offset(currentProgressWidth, cy)
+            )
         }
-        Row(Modifier.fillMaxWidth().padding(top = PlayerSliderDefaults.TIME_LABEL_TOP_MARGIN)) {
-            Text(position.formatDuration(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+        Row(Modifier
+            .fillMaxWidth()
+            .padding(top = PlayerSliderDefaults.TIME_LABEL_TOP_MARGIN)) {
+            Text(posLabel, style = labelStyle, color = labelColor)
             Spacer(Modifier.weight(1f))
-            Text(duration.formatDuration(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(durLabel, style = labelStyle, color = labelColor)
         }
     }
 }

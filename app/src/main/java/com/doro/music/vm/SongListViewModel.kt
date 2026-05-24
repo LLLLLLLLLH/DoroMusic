@@ -33,7 +33,7 @@ class SongListViewModel(
 ) : BaseViewModel() {
 
     val playlist = getPlaylistsUseCase().cachedIn(viewModelScope)
-    val selectedSong: StateFlow<Long?>
+    val selectedSongId: StateFlow<Long?>
         field = MutableStateFlow<Long?>(null)
     private val source = MutableStateFlow<SongListSource?>(null)
 
@@ -102,7 +102,7 @@ class SongListViewModel(
     }
 
     fun addSongToPlaylist(playlists: Set<Playlist>) {
-        val songId = selectedSong.value ?: return
+        val songId = selectedSongId.value ?: return
         viewModelScope.launch {
             val result = safeCall { addSongToPlaylistUseCase(songId = songId, playlists = playlists.toList()) }
                 .getOrDefault(AddSongResult.Failed)
@@ -118,6 +118,6 @@ class SongListViewModel(
     }
 
     fun selectSong(id: Long?) {
-        selectedSong.tryEmit(id)
+        selectedSongId.tryEmit(id)
     }
 }

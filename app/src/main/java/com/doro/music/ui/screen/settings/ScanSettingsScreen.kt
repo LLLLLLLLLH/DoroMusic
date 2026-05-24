@@ -11,7 +11,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChevronRight
@@ -25,7 +27,6 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -34,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation3.runtime.EntryProviderScope
@@ -45,30 +47,48 @@ import com.doro.music.ui.component.SettingsScaffold
 import com.doro.music.vm.SettingsViewModel
 import org.koin.compose.viewmodel.koinViewModel
 
-private val DIALOG_MAX_HEIGHT = 300.dp
-private const val DURATION_MAX_SECONDS = 60
-private const val DURATION_STEP_SIZE = 10
-private const val DURATION_SLIDER_STEPS = (DURATION_MAX_SECONDS / DURATION_STEP_SIZE) - 1
+private object ScanSettingsDefaults {
+    const val DURATION_MAX_SECONDS = 60
+    const val DURATION_STEP_SIZE = 10
+    const val DURATION_SLIDER_STEPS = (DURATION_MAX_SECONDS / DURATION_STEP_SIZE) - 1
+}
 
 fun EntryProviderScope<NavKey>.scanSettingsEntry(onBack: () -> Unit) {
     entry<SettingsNavKey.Scan> {
-        ScanSettingsScreen(onBack = onBack)
+        ScanSettingsRoute(onBack = onBack)
     }
+}
+
+@Composable
+fun ScanSettingsRoute(
+    vm: SettingsViewModel = koinViewModel(),
+    onBack: () -> Unit
+) {
+    val settings by vm.settings.collectAsStateWithLifecycle()
+    val folders by vm.folders.collectAsStateWithLifecycle()
+
+    ScanSettingsScreen(
+        minDurationFilter = settings.minDurationFilter,
+        folders = folders,
+        onMinDurationChange = vm::setMinDurationFilter,
+        onExcludedFoldersChange = vm::setExcludedFolders,
+        onBack = onBack
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ScanSettingsScreen(
-    vm: SettingsViewModel = koinViewModel(),
+private fun ScanSettingsScreen(
+    minDurationFilter: Int,
+    folders: List<Folder>,
+    onMinDurationChange: (Int) -> Unit,
+    onExcludedFoldersChange: (List<String>) -> Unit,
     onBack: () -> Unit
 ) {
     var showDurationDialog by remember { mutableStateOf(false) }
     var showFolderDialog by remember { mutableStateOf(false) }
 
-    val settings by vm.settings.collectAsStateWithLifecycle()
-    val folders by vm.folders.collectAsStateWithLifecycle()
-
-    val excludedFoldersCount = folders.excludedFolders().size
+    val excludedFoldersCount = remember(folders) { folders.excludedFolders().size }
 
     SettingsScaffold(
         title = stringResource(R.string.scan_settings),
@@ -85,8 +105,8 @@ fun ScanSettingsScreen(
                 headlineContent = { Text(stringResource(R.string.min_duration_filter)) },
                 supportingContent = {
                     Text(
-                        if (settings.minDurationFilter == 0) stringResource(R.string.no_filter)
-                        else stringResource(R.string.seconds_value, settings.minDurationFilter)
+                        if (minDurationFilter == 0) stringResource(R.string.no_filter)
+                        else stringResource(R.string.seconds_value, minDurationFilter)
                     )
                 },
                 trailingContent = {
@@ -117,9 +137,9 @@ fun ScanSettingsScreen(
 
     if (showDurationDialog) {
         DurationFilterDialog(
-            current = settings.minDurationFilter,
+            current = minDurationFilter,
             onConfirm = {
-                vm.setMinDurationFilter(it)
+                onMinDurationChange(it)
                 showDurationDialog = false
             },
             onDismiss = { showDurationDialog = false }
@@ -130,7 +150,7 @@ fun ScanSettingsScreen(
         ExcludedFoldersDialog(
             folders = folders,
             onConfirm = {
-                vm.setExcludedFolders(it)
+                onExcludedFoldersChange(it)
                 showFolderDialog = false
             },
             onDismiss = { showFolderDialog = false }
@@ -161,8 +181,8 @@ private fun DurationFilterDialog(
                 Slider(
                     value = sliderValue.toFloat(),
                     onValueChange = { sliderValue = it.toInt() },
-                    valueRange = 0f..DURATION_MAX_SECONDS.toFloat(),
-                    steps = DURATION_SLIDER_STEPS,
+                    valueRange = 0f..ScanSettingsDefaults.DURATION_MAX_SECONDS.toFloat(),
+                    steps = ScanSettingsDefaults.DURATION_SLIDER_STEPS,
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -170,10 +190,10 @@ private fun DurationFilterDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    val labelCount = DURATION_MAX_SECONDS / DURATION_STEP_SIZE + 1
+                    val labelCount = ScanSettingsDefaults.DURATION_MAX_SECONDS / ScanSettingsDefaults.DURATION_STEP_SIZE + 1
                     repeat(labelCount) { step ->
                         Text(
-                            text = "${step * DURATION_STEP_SIZE}s",
+                            text = "${step * ScanSettingsDefaults.DURATION_STEP_SIZE}s",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -200,9 +220,8 @@ private fun ExcludedFoldersDialog(
     onConfirm: (List<String>) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val excluded = folders.excludedFolders().map { it.path }.toSet()
-    var selected by remember(folders) { mutableStateOf(excluded) }
-
+    val excluded = remember(folders) { folders.excludedFolders().map { it.path }.toSet() }
+    var selected by remember { mutableStateOf(excluded) }
 
     val toggleSelection: (String) -> Unit = { path ->
         selected = if (path in selected) selected - path else selected + path
@@ -212,36 +231,41 @@ private fun ExcludedFoldersDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.excluded_folders)) },
         text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(DIALOG_MAX_HEIGHT)
-                    .verticalScroll(rememberScrollState())
-            ) {
-                if (folders.isEmpty()) {
-                    Box(
-                        modifier = Modifier.fillMaxWidth(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = stringResource(R.string.no_folders),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                } else {
-                    folders.forEach { folder ->
+            if (folders.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = stringResource(R.string.no_folders),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(
+                        folders.size,
+                        key = { folders[it].path }
+                    ) { index ->
+                        val folder = folders[index]
                         val isSelected = folder.path in selected
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { toggleSelection(folder.path) }
+                                .toggleable(
+                                    value = isSelected,
+                                    onValueChange = { toggleSelection(folder.path) },
+                                    role = Role.Checkbox
+                                )
                                 .padding(horizontal = 8.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Checkbox(
                                 checked = isSelected,
-                                onCheckedChange = { toggleSelection(folder.path) }
+                                onCheckedChange = null // 事件已托管给上层 Row
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(

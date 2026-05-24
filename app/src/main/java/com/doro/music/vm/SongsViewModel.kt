@@ -31,19 +31,20 @@ class SongsViewModel(
 ) : BaseViewModel() {
 
     val playlist = getPlaylistsUseCase().cachedIn(viewModelScope)
-    val selectedSong: StateFlow<Long?>
+
+    val selectedSongId: StateFlow<Long?>
         field =  MutableStateFlow<Long?>(null)
 
     val songs = sortMode.flatMapLatest(repo::getSongs).cachedIn(viewModelScope)
     val songCount = repo.getSongCount().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), 0)
 
     fun selectSong(id: Long?) {
-        selectedSong.tryEmit(id)
+        selectedSongId.tryEmit(id)
     }
 
     fun addSongToPlaylist(playlists: Set<Playlist>) {
         viewModelScope.launch {
-            val songId = selectedSong.value ?: return@launch
+            val songId = selectedSongId.value ?: return@launch
             val result = safeCall { addSongToPlaylistUseCase(songId = songId, playlists = playlists.toList()) }
                 .getOrDefault(AddSongResult.Failed)
             emitEvent(UiEvent.SongAddedToPlaylist(result))

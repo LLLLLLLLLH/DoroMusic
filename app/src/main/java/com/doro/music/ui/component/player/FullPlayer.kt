@@ -19,10 +19,17 @@ import com.doro.music.data.model.PlaybackState
 import com.doro.music.data.model.Song
 import com.doro.music.ui.component.SheetProgressState
 
+
+private object FullPlayerLayoutId {
+    const val COLLAPSE_BUTTON = "collapseButton"
+    const val DISPLAY = "display"
+    const val CONTROLS = "controls"
+}
+
 private val PortraitConstraints = ConstraintSet {
-    val collapseButton = createRefFor("collapseButton")
-    val display = createRefFor("display")
-    val controls = createRefFor("controls")
+    val collapseButton = createRefFor(FullPlayerLayoutId.COLLAPSE_BUTTON)
+    val display = createRefFor(FullPlayerLayoutId.DISPLAY)
+    val controls = createRefFor(FullPlayerLayoutId.CONTROLS)
 
     constrain(collapseButton) {
         top.linkTo(parent.top)
@@ -46,9 +53,9 @@ private val PortraitConstraints = ConstraintSet {
 }
 
 private val LandscapeConstraints = ConstraintSet {
-    val collapseButton = createRefFor("collapseButton")
-    val display = createRefFor("display")
-    val controls = createRefFor("controls")
+    val collapseButton = createRefFor(FullPlayerLayoutId.COLLAPSE_BUTTON)
+    val display = createRefFor(FullPlayerLayoutId.DISPLAY)
+    val controls = createRefFor(FullPlayerLayoutId.CONTROLS)
 
     constrain(collapseButton) {
         top.linkTo(parent.top)
@@ -93,7 +100,7 @@ fun FullPlayer(
     ) {
         IconButton(
             onClick = { onActionClick(PlayerAction.TogglePlayerSheet) },
-            modifier = Modifier.layoutId("collapseButton")
+            modifier = Modifier.layoutId(FullPlayerLayoutId.COLLAPSE_BUTTON)
         ) {
             Icon(
                 imageVector = Icons.Rounded.KeyboardArrowDown,
@@ -101,7 +108,7 @@ fun FullPlayer(
             )
         }
         PlayerDisplay(
-            modifier = Modifier.layoutId("display"),
+            modifier = Modifier.layoutId(FullPlayerLayoutId.DISPLAY),
             song = song,
             playbackState = playbackState,
             currentView = playerViewType,
@@ -110,7 +117,7 @@ fun FullPlayer(
             onActionClick = onActionClick
         )
         PlayerControls(
-            modifier = Modifier.layoutId("controls"),
+            modifier = Modifier.layoutId(FullPlayerLayoutId.CONTROLS),
             song = song,
             playbackState = playbackState,
             playMode = playMode,

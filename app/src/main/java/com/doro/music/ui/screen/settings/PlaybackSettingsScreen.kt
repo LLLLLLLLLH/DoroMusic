@@ -35,17 +35,31 @@ import org.koin.compose.viewmodel.koinViewModel
 
 fun EntryProviderScope<NavKey>.playbackSettingsEntry(onBack: () -> Unit) {
     entry<SettingsNavKey.Playback> {
-        PlaybackSettingsScreen(onBack = onBack)
+        PlaybackSettingsRoute(onBack = onBack)
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PlaybackSettingsScreen(
+fun PlaybackSettingsRoute(
     vm: SettingsViewModel = koinViewModel(),
     onBack: () -> Unit
 ) {
     val settings by vm.settings.collectAsStateWithLifecycle()
+
+    PlaybackSettingsScreen(
+        defaultPlayMode = settings.defaultPlayMode,
+        onPlayModeChange = vm::setPlayMode,
+        onBack = onBack
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PlaybackSettingsScreen(
+    defaultPlayMode: PlayMode,
+    onPlayModeChange: (PlayMode) -> Unit,
+    onBack: () -> Unit
+) {
     var expanded by remember { mutableStateOf(false) }
 
     SettingsScaffold(
@@ -67,7 +81,7 @@ fun PlaybackSettingsScreen(
                         .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
                         .fillMaxWidth(),
                     headlineContent = { Text(stringResource(R.string.default_play_mode)) },
-                    supportingContent = { Text(settings.defaultPlayMode.toDisplayName()) },
+                    supportingContent = { Text(defaultPlayMode.toDisplayName()) },
                     trailingContent = {
                         ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
                     }
@@ -80,11 +94,11 @@ fun PlaybackSettingsScreen(
                         DropdownMenuItem(
                             text = { Text(mode.toDisplayName()) },
                             onClick = {
-                                vm.setPlayMode(mode)
+                                onPlayModeChange(mode)
                                 expanded = false
                             },
                             trailingIcon = {
-                                if (mode == settings.defaultPlayMode) {
+                                if (mode == defaultPlayMode) {
                                     Icon(
                                         imageVector = Icons.Rounded.Check,
                                         contentDescription = null,
@@ -106,4 +120,3 @@ private fun PlayMode.toDisplayName(): String = stringResource(when (this) {
     PlayMode.SHUFFLE -> R.string.play_mode_shuffle
     PlayMode.REPEAT_ONE -> R.string.play_mode_repeat_one
 })
-

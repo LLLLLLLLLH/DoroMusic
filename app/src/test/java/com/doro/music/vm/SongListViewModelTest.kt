@@ -64,14 +64,14 @@ class SongListViewModelTest {
     @Test
     fun `selectSong updates selectedSong state`() = runTest {
         viewModel.selectSong(123L)
-        assertEquals(123L, viewModel.selectedSong.value)
+        assertEquals(123L, viewModel.selectedSongId.value)
     }
 
     @Test
     fun `selectSong with null clears selection`() = runTest {
         viewModel.selectSong(123L)
         viewModel.selectSong(null)
-        assertNull(viewModel.selectedSong.value)
+        assertNull(viewModel.selectedSongId.value)
     }
 
     @Test

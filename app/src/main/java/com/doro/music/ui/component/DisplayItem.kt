@@ -31,9 +31,32 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.doro.music.data.model.DisplayMode
+
+private object DisplayItemDefaults {
+    val CompactImageSize = 40.dp
+    val ListImageSize = 48.dp
+    val ImageCorner = 8.dp
+    val HorizontalPadding = 20.dp
+    val InternalSpacing = 12.dp
+    val GridPadding = 4.dp
+    val GridTextTopMargin = 6.dp
+
+    val ListVerticalPadding = 8.dp
+    val CompactVerticalPadding = 4.dp
+
+    val SpacingHigh = 2.dp
+    val SpacingLow = 1.dp
+
+    val TitleSizeLarge = 15.sp
+    val TitleSizeNormal = 14.sp
+    val SubtitleSizeLarge = 13.sp
+    val SubtitleSizeNormal = 12.sp
+}
 
 @Composable
 fun DisplayItem(
@@ -46,85 +69,86 @@ fun DisplayItem(
     menu: @Composable (OptionMenuScope.() -> Unit)? = null,
     onClick: () -> Unit = {}
 ) {
+    val commonModifier = modifier
+        .fillMaxWidth()
+        .clickable(onClick = onClick)
+
     when (mode) {
-        DisplayMode.GRID -> GridItem(modifier, title, subtitle, albumArt, placeholderIcon, onClick)
-        DisplayMode.LIST -> ListItem(modifier, title, subtitle, albumArt, placeholderIcon, menu, onClick)
-        DisplayMode.COMPACT -> CompactItem(modifier, title, subtitle, albumArt, placeholderIcon, menu, onClick)
+        DisplayMode.GRID -> GridItem(
+            modifier = commonModifier,
+            title = title,
+            subtitle = subtitle,
+            albumArt = albumArt,
+            placeholderIcon = placeholderIcon
+        )
+
+        DisplayMode.LIST -> HorizontalItem(
+            modifier = commonModifier,
+            title = title,
+            subtitle = subtitle,
+            albumArt = albumArt,
+            imageSize = DisplayItemDefaults.ListImageSize,
+            verticalPadding = DisplayItemDefaults.ListVerticalPadding,
+            titleSize = DisplayItemDefaults.TitleSizeLarge,
+            subtitleSize = DisplayItemDefaults.SubtitleSizeLarge,
+            spacing = DisplayItemDefaults.SpacingHigh,
+            placeholderIcon = placeholderIcon,
+            menu = menu
+        )
+
+        DisplayMode.COMPACT -> HorizontalItem(
+            modifier = commonModifier,
+            title = title,
+            subtitle = subtitle,
+            albumArt = albumArt,
+            imageSize = DisplayItemDefaults.CompactImageSize,
+            verticalPadding = DisplayItemDefaults.CompactVerticalPadding,
+            titleSize = DisplayItemDefaults.TitleSizeNormal,
+            subtitleSize = DisplayItemDefaults.SubtitleSizeNormal,
+            spacing = DisplayItemDefaults.SpacingLow,
+            placeholderIcon = placeholderIcon,
+            menu = menu
+        )
     }
 }
 
 @Composable
-private fun CompactItem(
-    modifier: Modifier = Modifier,
+private fun HorizontalItem(
+    modifier: Modifier,
     title: String,
     subtitle: String,
     albumArt: String?,
-    placeholderIcon: ImageVector = Icons.Rounded.AudioFile,
-    menu: @Composable (OptionMenuScope.() -> Unit)? = null,
-    onClick: () -> Unit = {}
+    imageSize: Dp,
+    verticalPadding: Dp,
+    titleSize: TextUnit,
+    subtitleSize: TextUnit,
+    spacing: Dp,
+    placeholderIcon: ImageVector,
+    menu: @Composable (OptionMenuScope.() -> Unit)?
 ) {
     Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 4.dp, horizontal = 20.dp),
+        modifier = modifier.padding(
+            vertical = verticalPadding,
+            horizontal = DisplayItemDefaults.HorizontalPadding
+        ),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        ArtworkImage(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+        ItemImage(
+            modifier = Modifier.size(imageSize),
             imageUrl = albumArt,
             placeholderIcon = placeholderIcon
         )
 
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(DisplayItemDefaults.InternalSpacing))
 
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Spacer(modifier = Modifier.height(1.dp))
-            Text(subtitle, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-
-        MoreMenuButton(content = menu)
-    }
-}
-
-@Composable
-private fun ListItem(
-    modifier: Modifier = Modifier,
-    title: String,
-    subtitle: String,
-    albumArt: String?,
-    placeholderIcon: ImageVector = Icons.Rounded.AudioFile,
-    menu: @Composable (OptionMenuScope.() -> Unit)? = null,
-    onClick: () -> Unit = {}
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 8.dp, horizontal = 20.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-
-        ArtworkImage(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-            imageUrl = albumArt,
-            placeholderIcon = placeholderIcon
+        ItemInfoColumn(
+            modifier = Modifier.weight(1f),
+            title = title,
+            subtitle = subtitle,
+            titleSize = titleSize,
+            subtitleSize = subtitleSize,
+            spacing = spacing
         )
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title, fontSize = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(subtitle, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
 
         MoreMenuButton(content = menu)
     }
@@ -132,49 +156,101 @@ private fun ListItem(
 
 @Composable
 private fun GridItem(
-    modifier: Modifier = Modifier,
+    modifier: Modifier,
     title: String,
     subtitle: String,
     albumArt: String?,
-    placeholderIcon: ImageVector = Icons.Rounded.AudioFile,
-    onClick: () -> Unit = {}
+    placeholderIcon: ImageVector
 ) {
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(4.dp),
+        modifier = modifier.padding(DisplayItemDefaults.GridPadding),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        ArtworkImage(
+        ItemImage(
             modifier = Modifier
                 .aspectRatio(1f)
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .fillMaxWidth(),
             imageUrl = albumArt,
             placeholderIcon = placeholderIcon
         )
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(title, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(subtitle, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Spacer(modifier = Modifier.height(DisplayItemDefaults.GridTextTopMargin))
+        ItemInfoColumn(
+            modifier = Modifier.fillMaxWidth(),
+            title = title,
+            subtitle = subtitle,
+            titleSize = DisplayItemDefaults.TitleSizeNormal,
+            subtitleSize = DisplayItemDefaults.SubtitleSizeNormal,
+            spacing = DisplayItemDefaults.SpacingHigh,
+            horizontalAlignment = Alignment.CenterHorizontally
+        )
     }
 }
 
 @Composable
-private fun MoreMenuButton(content: @Composable (OptionMenuScope.() -> Unit)? = null) {
+private fun ItemImage(
+    modifier: Modifier,
+    imageUrl: String?,
+    placeholderIcon: ImageVector
+) {
+    ArtworkImage(
+        modifier = modifier
+            .clip(RoundedCornerShape(DisplayItemDefaults.ImageCorner))
+            .background(MaterialTheme.colorScheme.surfaceVariant),
+        imageUrl = imageUrl,
+        placeholderIcon = placeholderIcon
+    )
+}
+
+@Composable
+private fun ItemInfoColumn(
+    modifier: Modifier,
+    title: String,
+    subtitle: String,
+    titleSize: TextUnit,
+    subtitleSize: TextUnit,
+    spacing: Dp,
+    horizontalAlignment: Alignment.Horizontal = Alignment.Start
+) {
+    Column(modifier = modifier, horizontalAlignment = horizontalAlignment) {
+        Text(
+            text = title,
+            fontSize = titleSize,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Spacer(modifier = Modifier.height(spacing))
+        Text(
+            text = subtitle,
+            fontSize = subtitleSize,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun MoreMenuButton(
+    content: @Composable (OptionMenuScope.() -> Unit)? = null
+) {
     if (content == null) return
 
     var showMore by remember { mutableStateOf(false) }
 
+    val onDismiss = remember { { showMore = false } }
+    val onClick = remember { { showMore = true } }
+
     Box {
-        IconButton(onClick = { showMore = true }) {
-            Icon(Icons.Rounded.MoreVert, contentDescription = null)
+        IconButton(onClick = onClick) {
+            Icon(
+                imageVector = Icons.Rounded.MoreVert,
+                contentDescription = Icons.Rounded.MoreVert.name
+            )
         }
         OptionMenu(
             expanded = showMore,
-            onDismissRequest = { showMore = false },
+            onDismissRequest = onDismiss,
             content = content
         )
     }

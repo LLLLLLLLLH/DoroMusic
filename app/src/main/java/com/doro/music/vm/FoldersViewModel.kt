@@ -38,20 +38,25 @@ class FoldersViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), emptyList())
 
     private val selectedFolder = MutableStateFlow<String?>(null)
-    val songs = selectedFolder.filterNotNull().flatMapLatest(repo::getSongsByFolder).cachedIn(viewModelScope)
+
+    val songs = selectedFolder.filterNotNull()
+        .flatMapLatest(repo::getSongsByFolder)
+        .cachedIn(viewModelScope)
+
     val playlist = getPlaylistsUseCase().cachedIn(viewModelScope)
-    val selectedSong: StateFlow<Long?>
+
+    val selectedSongId: StateFlow<Long?>
      field = MutableStateFlow<Long?>(null)
 
     fun selectFolder(path: String?) { selectedFolder.tryEmit(path) }
-    fun selectSong(id: Long?) { selectedSong.tryEmit(id) }
+    fun selectSong(id: Long?) { selectedSongId.tryEmit(id) }
 
     fun addToNext(song: Song) {
         actionDispatcher.dispatch(PlayAction.InsertSingle(song.id))
     }
 
     fun addSongToPlaylist(playlists: Set<Playlist>) {
-        val songId = selectedSong.value ?: return
+        val songId = selectedSongId.value ?: return
         viewModelScope.launch {
             val result = addSongToPlaylistUseCase(songId = songId, playlists = playlists.toList())
             emitEvent(UiEvent.SongAddedToPlaylist(result))
