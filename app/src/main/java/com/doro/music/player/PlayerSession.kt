@@ -2,23 +2,22 @@ package com.doro.music.player
 
 import android.content.ComponentName
 import android.content.Context
-import android.util.Log
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import androidx.paging.PagingData
+import com.doro.music.data.datastore.PlayStateDataStore
 import com.doro.music.data.model.PlayMode
 import com.doro.music.data.model.PlaybackState
-import com.doro.music.player.controller.MediaPlaybackController
-import com.doro.music.player.controller.PlaybackController
-import com.doro.music.player.model.PlayUiState
-import com.doro.music.player.model.QueueSong
 import com.doro.music.data.repo.QueueReadOps
 import com.doro.music.data.repo.QueueWriteOps
-import com.doro.music.player.service.PlayerService
-import com.doro.music.data.datastore.PlayStateDataStore
 import com.doro.music.player.controller.EngineEvent
+import com.doro.music.player.controller.MediaPlaybackController
+import com.doro.music.player.controller.PlaybackController
 import com.doro.music.player.model.PlayAction
+import com.doro.music.player.model.PlayUiState
+import com.doro.music.player.model.QueueSong
+import com.doro.music.player.service.PlayerService
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
 import kotlinx.coroutines.CoroutineScope
@@ -71,29 +70,24 @@ class PlayerSession(
     private val playbackController: PlaybackController = MediaPlaybackController(this)
 
     private var future: ListenableFuture<MediaController>? = null
-
     private var mediaController: MediaController? = null
-    override val controller: MediaController?
-        get() = mediaController
+    override val controller: MediaController? get() = mediaController
 
     override val isConnected = MutableStateFlow(false)
 
-    // ==================== PlayStateObserver：状态暴露 ====================
+    // ==================== PlayStateObserver ====================
 
     override val uiState = MutableStateFlow(PlayUiState.Empty)
-
     override val currentPositionMs = MutableStateFlow(0L)
+    override val playQueue: Flow<PagingData<QueueSong>> get() = queueReadOps.getPagedPlaybackQueue()
 
-    override val playQueue: Flow<PagingData<QueueSong>>
-        get() = queueReadOps.getPagedPlaybackQueue()
-
-    // ==================== PlayActionDispatcher：指令分发 ====================
+    // ==================== PlayActionDispatcher ====================
 
     override fun dispatch(action: PlayAction) {
         scope.launch { handleAction(action) }
     }
 
-    // ==================== PlayerConnector：连接管理 ====================
+    // ==================== PlayerConnector ====================
 
     init {
         observeConnection()
@@ -118,7 +112,7 @@ class PlayerSession(
         mediaController = null
     }
 
-    // ==================== 连接状态订阅 ====================
+    // ==================== 连接生命周期 ====================
 
     private fun observeConnection() {
         scope.launch {
@@ -141,7 +135,7 @@ class PlayerSession(
         sessionJob = null
     }
 
-    // ==================== 动作处理 ====================
+    // ==================== Action 分发 ====================
 
     private suspend fun handleAction(action: PlayAction) {
         when (action) {
@@ -170,78 +164,52 @@ class PlayerSession(
     private suspend fun handleSeekToQueueItem(queueId: Long) {
         val playMode = stateDataStore.playMode.first()
         playSongWithPreload(queueId, playMode, positionMs = 0L, startPlaying = true)
-        queueOps.getSongIdByQueueId(queueId)
-            ?.let { savePlaybackState(queueId, it, 0L) }
+        queueOps.getSongIdByQueueId(queueId)?.let { savePlaybackState(queueId, it, 0L) }
     }
 
     private suspend fun handleNext() = navigationMutex.withLock {
-        val currentQueueId = stateDataStore.currentQueueId.first()
-        if (currentQueueId == 0L) {
-            Log.w(TAG, "handleNext: no current queue id")
-            return@withLock
-        }
-        val playMode = stateDataStore.playMode.first()
-        val currentOrder = queueOps.getOrder(currentQueueId, playMode)
-        if (currentOrder == null) {
-            Log.w(TAG, "handleNext: order not found for queueId=$currentQueueId")
-            return@withLock
-        }
-        val nextQueueId = queueOps.getNextQueueId(currentOrder, playMode)
-            ?: queueOps.getFirstQueueId(playMode)
-        if (nextQueueId == null) {
-            Log.w(TAG, "handleNext: no next queue id available")
-            return@withLock
-        }
-        if (playbackController.hasNext()) {
-            playbackController.seekToNext()
-        } else {
-            playSongWithPreload(nextQueueId, playMode, positionMs = 0L, startPlaying = true)
-        }
-        val songId = queueOps.getSongIdByQueueId(nextQueueId) ?: return@withLock
-        savePlaybackState(nextQueueId, songId, 0L)
-        scope.launch { preloadNext(nextQueueId, playMode) }
+        navigateTo(
+            resolveTarget = { order, mode -> queueOps.getNextQueueId(order, mode) ?: queueOps.getFirstQueueId(mode) },
+            useEngineSeek = playbackController::hasNext,
+            engineSeek = playbackController::seekToNext
+        )
     }
 
     private suspend fun handlePrev() = navigationMutex.withLock {
+        navigateTo(
+            resolveTarget = { order, mode -> queueOps.getPrevQueueId(order, mode) ?: queueOps.getLastQueueId(mode) },
+            useEngineSeek = playbackController::hasPrev,
+            engineSeek = playbackController::seekToPrev
+        )
+    }
+
+    /**
+     * 上一首/下一首的统一导航逻辑。
+     * 优先使用 ExoPlayer 内置切换（已有预加载），否则重新加载目标歌曲。
+     */
+    private suspend fun navigateTo(
+        resolveTarget: suspend (String, PlayMode) -> Long?,
+        useEngineSeek: suspend () -> Boolean,
+        engineSeek: suspend () -> Unit
+    ) {
         val currentQueueId = stateDataStore.currentQueueId.first()
-        if (currentQueueId == 0L) {
-            Log.w(TAG, "handlePrev: no current queue id")
-            return@withLock
-        }
+        if (currentQueueId == 0L) return
         val playMode = stateDataStore.playMode.first()
-        val currentOrder = queueOps.getOrder(currentQueueId, playMode)
-        if (currentOrder == null) {
-            Log.w(TAG, "handlePrev: order not found for queueId=$currentQueueId")
-            return@withLock
-        }
-        val prevQueueId = queueOps.getPrevQueueId(currentOrder, playMode)
-            ?: queueOps.getLastQueueId(playMode)
-        if (prevQueueId == null) {
-            Log.w(TAG, "handlePrev: no prev queue id available")
-            return@withLock
-        }
-        if (playbackController.hasPrev()) {
-            playbackController.seekToPrev()
-        } else {
-            playSongWithPreload(prevQueueId, playMode, positionMs = 0L, startPlaying = true)
-        }
-        val songId = queueOps.getSongIdByQueueId(prevQueueId) ?: return@withLock
-        savePlaybackState(prevQueueId, songId, 0L)
-        scope.launch { preloadNext(prevQueueId, playMode) }
+        val currentOrder = queueOps.getOrder(currentQueueId, playMode) ?: return
+        val targetQueueId = resolveTarget(currentOrder, playMode) ?: return
+        if (useEngineSeek()) engineSeek() else playSongWithPreload(targetQueueId, playMode, 0L, true)
+        queueOps.getSongIdByQueueId(targetQueueId)?.let { savePlaybackState(targetQueueId, it, 0L) }
+        scope.launch { preloadNext(targetQueueId, playMode) }
     }
 
     private suspend fun handleTogglePlay() {
-        when (uiState.value.playbackState) {
-            PlaybackState.PLAYING -> {
-                playbackController.pause()
-                uiState.update { it.copy(playbackState = PlaybackState.PAUSED) }
-            }
-            PlaybackState.PAUSED -> {
-                playbackController.play()
-                uiState.update { it.copy(playbackState = PlaybackState.PLAYING) }
-            }
-            else -> Unit
+        val (newState, controllerAction) = when (uiState.value.playbackState) {
+            PlaybackState.PLAYING -> PlaybackState.PAUSED to playbackController::pause
+            PlaybackState.PAUSED -> PlaybackState.PLAYING to playbackController::play
+            else -> return
         }
+        controllerAction()
+        uiState.update { it.copy(playbackState = newState) }
     }
 
     private suspend fun handleSeekTo(action: PlayAction.SeekTo) {
@@ -251,21 +219,22 @@ class PlayerSession(
     }
 
     private suspend fun handleInsertSingle(action: PlayAction.InsertSingle) {
-        val currentQueueId = stateDataStore.currentQueueId.first()
-        if (currentQueueId == 0L) {
-            playAsNewQueue(listOf(action.songId), action.songId)
-        } else {
-            queueOps.insertNext(currentQueueId, listOf(action.songId))
-            refreshPreload(currentQueueId)
-        }
+        insertOrPlayAsNew(listOf(action.songId), action.songId)
     }
 
     private suspend fun handleInsertGroup(action: PlayAction.InsertGroup) {
         val songIds = queueOps.resolveSongIds(action.playContext)
         if (songIds.isEmpty()) return
+        insertOrPlayAsNew(songIds, songIds.first())
+    }
+
+    /**
+     * 如果已有播放队列则插入到下一首，否则作为新队列播放。
+     */
+    private suspend fun insertOrPlayAsNew(songIds: List<Long>, targetSongId: Long) {
         val currentQueueId = stateDataStore.currentQueueId.first()
         if (currentQueueId == 0L) {
-            playAsNewQueue(songIds, songIds.first())
+            playAsNewQueue(songIds, targetSongId)
         } else {
             queueOps.insertNext(currentQueueId, songIds)
             refreshPreload(currentQueueId)
@@ -282,8 +251,7 @@ class PlayerSession(
     private suspend fun handleTogglePlayMode() {
         val currentQueueId = stateDataStore.currentQueueId.first()
         if (currentQueueId == 0L) return
-        val currentMode = stateDataStore.playMode.first()
-        val nextMode = currentMode.next()
+        val nextMode = stateDataStore.playMode.first().next()
         when (nextMode) {
             PlayMode.SHUFFLE -> {
                 stateDataStore.saveShuffleSeed(System.currentTimeMillis())
@@ -299,48 +267,32 @@ class PlayerSession(
 
     private suspend fun handleRemoveFromQueue(queueId: Long) {
         val isCurrentSong = stateDataStore.currentQueueId.first() == queueId
-        val nextQueueIdAfterRemove: Long?
-        val prevQueueIdAfterRemove: Long?
-        if (isCurrentSong) {
+        val (nextAfterRemove, prevAfterRemove) = if (isCurrentSong) {
             val playMode = stateDataStore.playMode.first()
-            val currentOrder = queueOps.getOrder(queueId, playMode)
-            nextQueueIdAfterRemove = currentOrder?.let { queueOps.getNextQueueId(it, playMode) }
-            prevQueueIdAfterRemove = currentOrder?.let { queueOps.getPrevQueueId(it, playMode) }
-        } else {
-            nextQueueIdAfterRemove = null
-            prevQueueIdAfterRemove = null
-        }
+            val order = queueOps.getOrder(queueId, playMode)
+            (order?.let { queueOps.getNextQueueId(it, playMode) }) to (order?.let { queueOps.getPrevQueueId(it, playMode) })
+        } else null to null
+
         queueOps.removeByQueueId(queueId)
+
         if (isCurrentSong) {
-            val remainingSize = queueOps.getQueueSize()
-            if (remainingSize == 0) {
-                playbackController.pause()
-                stateDataStore.saveCurrentQueueId(0L)
-                stateDataStore.saveCurrentSongId(0L)
-                stateDataStore.saveCurrentPosition(0L)
-                uiState.value = PlayUiState.Empty
-            } else {
-                val targetQueueId = nextQueueIdAfterRemove ?: prevQueueIdAfterRemove
-                if (targetQueueId != null) handleSeekToQueueItem(targetQueueId)
-            }
+            if (queueOps.getQueueSize() == 0) clearPlaybackState()
+            else (nextAfterRemove ?: prevAfterRemove)?.let { handleSeekToQueueItem(it) }
         } else {
             val currentQueueId = stateDataStore.currentQueueId.first()
             if (currentQueueId != 0L) refreshPreload(currentQueueId)
         }
     }
 
-    // ==================== 引擎事件处理 ====================
+    // ==================== 引擎事件 ====================
 
     private suspend fun handleEngineEvent(event: EngineEvent) {
         when (event) {
             is EngineEvent.OnItemTransition -> handleItemTransition(event.queueId, event.reason)
             is EngineEvent.OnPositionUpdate -> currentPositionMs.value = event.positionMs
             is EngineEvent.OnIsPlayingChanged -> {
-                // 播放状态由 PlayerSession 在每个操作后主动设置，
-                // 此处仅处理外部触发的状态变化（如蓝牙断开、音频焦点丢失）
-                val currentState = uiState.value.playbackState
                 val engineState = if (event.isPlaying) PlaybackState.PLAYING else PlaybackState.PAUSED
-                if (currentState != engineState) {
+                if (uiState.value.playbackState != engineState) {
                     uiState.update { it.copy(playbackState = engineState) }
                 }
             }
@@ -348,12 +300,21 @@ class PlayerSession(
     }
 
     private suspend fun handleItemTransition(queueId: Long?, reason: Int) {
-        val validQueueId = queueId ?: return
-        if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED) return
-        val songId = queueOps.getSongIdByQueueId(validQueueId) ?: return
-        savePlaybackState(validQueueId, songId, 0L)
-        val playMode = stateDataStore.playMode.first()
-        scope.launch { preloadNext(validQueueId, playMode) }
+        if (reason != Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) return
+        when (val playMode = stateDataStore.playMode.first()) {
+            PlayMode.REPEAT_ONE -> {
+                val currentQueueId = stateDataStore.currentQueueId.first()
+                if (currentQueueId != 0L) {
+                    playSongWithPreload(currentQueueId, playMode, positionMs = 0L, startPlaying = true)
+                }
+            }
+            else -> {
+                val validQueueId = queueId ?: return
+                val songId = queueOps.getSongIdByQueueId(validQueueId) ?: return
+                savePlaybackState(validQueueId, songId, 0L)
+                scope.launch { preloadNext(validQueueId, playMode) }
+            }
+        }
     }
 
     // ==================== 进程恢复 ====================
@@ -382,33 +343,27 @@ class PlayerSession(
         startPlaying: Boolean
     ) {
         val currentSong = queueOps.getQueueSongById(queueId) ?: return
-        val currentOrder = queueOps.getOrder(queueId, playMode)
-        val nextSong = currentOrder
-            ?.let { queueOps.getNextQueueId(it, playMode) }
-            ?.let { queueOps.getQueueSongById(it) }
-        val songs = listOfNotNull(currentSong, nextSong)
-        playbackController.setQueue(songs, startIndex = 0, positionMs = positionMs)
+        val nextSong = resolveNextSong(queueId, playMode)
+        playbackController.setQueue(listOfNotNull(currentSong, nextSong), startIndex = 0, positionMs = positionMs)
         if (startPlaying) {
             playbackController.play()
             uiState.update { it.copy(playbackState = PlaybackState.PLAYING) }
         }
     }
 
+    /** 从 DataStore 读取当前 playMode 后刷新预加载 */
     private suspend fun refreshPreload(currentQueueId: Long) {
-        val playMode = stateDataStore.playMode.first()
-        val currentOrder = queueOps.getOrder(currentQueueId, playMode)
-        val nextSong = currentOrder
-            ?.let { queueOps.getNextQueueId(it, playMode) }
-            ?.let { queueOps.getQueueSongById(it) }
-        playbackController.replacePreload(listOfNotNull(nextSong))
+        preloadNext(currentQueueId, stateDataStore.playMode.first())
     }
 
     private suspend fun preloadNext(currentQueueId: Long, playMode: PlayMode) {
-        val currentOrder = queueOps.getOrder(currentQueueId, playMode)
-        val nextSong = currentOrder
+        playbackController.replacePreload(listOfNotNull(resolveNextSong(currentQueueId, playMode)))
+    }
+
+    private suspend fun resolveNextSong(queueId: Long, playMode: PlayMode): QueueSong? {
+        return queueOps.getOrder(queueId, playMode)
             ?.let { queueOps.getNextQueueId(it, playMode) }
             ?.let { queueOps.getQueueSongById(it) }
-        playbackController.replacePreload(listOfNotNull(nextSong))
     }
 
     // ==================== 状态辅助 ====================
@@ -418,6 +373,14 @@ class PlayerSession(
         stateDataStore.saveCurrentSongId(songId)
         stateDataStore.saveCurrentPosition(position)
         syncUiState()
+    }
+
+    private suspend fun clearPlaybackState() {
+        playbackController.pause()
+        stateDataStore.saveCurrentQueueId(0L)
+        stateDataStore.saveCurrentSongId(0L)
+        stateDataStore.saveCurrentPosition(0L)
+        uiState.value = PlayUiState.Empty
     }
 
     private suspend fun syncUiState() {
@@ -439,9 +402,5 @@ class PlayerSession(
         PlayMode.REPEAT -> PlayMode.SHUFFLE
         PlayMode.SHUFFLE -> PlayMode.REPEAT_ONE
         PlayMode.REPEAT_ONE -> PlayMode.REPEAT
-    }
-
-    private companion object {
-        const val TAG = "PlayerSession"
     }
 }

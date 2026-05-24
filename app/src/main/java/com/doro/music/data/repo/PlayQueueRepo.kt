@@ -28,17 +28,29 @@ class PlayQueueRepo(
 ) : QueueWriteOps, QueueReadOps {
 
     private companion object {
-        /** 默认 shuffle 排序键，表示未分配随机顺序 */
         const val DEFAULT_SHUFFLE_ORDER = "z"
     }
+
+    private inner class OrderAccess(private val mode: PlayMode) {
+        suspend fun getOrder(queueId: Long) = if (mode == PlayMode.SHUFFLE) queueDao.getShuffleOrder(queueId) else queueDao.getSortOrder(queueId)
+        suspend fun getNextOrder(current: String) = if (mode == PlayMode.SHUFFLE) queueDao.getNextShuffleOrder(current) else queueDao.getNextSortOrder(current)
+        suspend fun getPrevOrder(current: String) = if (mode == PlayMode.SHUFFLE) queueDao.getPrevShuffleOrder(current) else queueDao.getPrevSortOrder(current)
+        suspend fun getMinOrder() = if (mode == PlayMode.SHUFFLE) queueDao.getMinShuffleOrder() else queueDao.getMinSortOrder()
+        suspend fun getMaxOrder() = if (mode == PlayMode.SHUFFLE) queueDao.getMaxShuffleOrder() else queueDao.getMaxSortOrder()
+        suspend fun getQueueIdByOrder(order: String) = if (mode == PlayMode.SHUFFLE) queueDao.getQueueIdByExactShuffleOrder(order) else queueDao.getQueueIdByExactSortOrder(order)
+        suspend fun updateOrder(queueId: Long, newOrder: String) = if (mode == PlayMode.SHUFFLE) queueDao.updateShuffleOrder(queueId, newOrder) else queueDao.updateSortOrder(queueId, newOrder)
+    }
+
+    private fun PlayMode.orderAccess() = OrderAccess(this)
+
+    // ==================== QueueWriteOps ====================
 
     override suspend fun playNewQueue(songIds: List<Long>, targetSongId: Long, playMode: PlayMode): Long? {
         queueDao.clearQueue()
         val orders = FractionalIndexer.generateInitialList(songIds.size)
-        val entities = songIds.mapIndexed { index, songId ->
+        queueDao.insertAll(songIds.mapIndexed { index, songId ->
             PlayerQueueEntity(songId = songId, sortOrder = orders[index], shuffleOrder = DEFAULT_SHUFFLE_ORDER)
-        }
-        queueDao.insertAll(entities)
+        })
         val targetQueueId = queueDao.getQueueIdBySongId(targetSongId) ?: return null
         assignShuffleOrders(targetQueueId, System.currentTimeMillis())
         return targetQueueId
@@ -46,40 +58,28 @@ class PlayQueueRepo(
 
     override suspend fun insertNext(currentQueueId: Long, songIdsToInsert: List<Long>) {
         val currentSortOrder = queueDao.getSortOrder(currentQueueId) ?: return
-        val nextSortOrder = queueDao.getNextSortOrder(currentSortOrder)
         val sortInsertOrders = FractionalIndexer.generateBetweenList(
-            before = currentSortOrder, after = nextSortOrder, count = songIdsToInsert.size
+            before = currentSortOrder, after = queueDao.getNextSortOrder(currentSortOrder), count = songIdsToInsert.size
         )
-
         val shuffleInsertOrders = if (store.playMode.first() == PlayMode.SHUFFLE) {
             val currentShuffleOrder = queueDao.getShuffleOrder(currentQueueId) ?: return
-            val nextShuffleOrder = queueDao.getNextShuffleOrder(currentShuffleOrder)
             FractionalIndexer.generateBetweenList(
-                before = currentShuffleOrder, after = nextShuffleOrder, count = songIdsToInsert.size
+                before = currentShuffleOrder, after = queueDao.getNextShuffleOrder(currentShuffleOrder), count = songIdsToInsert.size
             )
         } else {
             List(songIdsToInsert.size) { DEFAULT_SHUFFLE_ORDER }
         }
-
-        val entities = songIdsToInsert.mapIndexed { index, songId ->
-            PlayerQueueEntity(
-                songId = songId,
-                sortOrder = sortInsertOrders[index],
-                shuffleOrder = shuffleInsertOrders[index]
-            )
-        }
-        queueDao.insertAll(entities)
+        queueDao.insertAll(songIdsToInsert.mapIndexed { index, songId ->
+            PlayerQueueEntity(songId = songId, sortOrder = sortInsertOrders[index], shuffleOrder = shuffleInsertOrders[index])
+        })
     }
 
     override suspend fun switchToShuffle(currentQueueId: Long) {
         val allQueueIds = queueDao.getAllQueueIdsSorted()
-        val seed = System.currentTimeMillis()
-        val others = allQueueIds.filter { it != currentQueueId }.shuffled(Random(seed))
+        val others = allQueueIds.filter { it != currentQueueId }.shuffled(Random(System.currentTimeMillis()))
         val orders = FractionalIndexer.generateInitialList(allQueueIds.size)
         queueDao.updateShuffleOrder(currentQueueId, orders[0])
-        others.forEachIndexed { index, queueId ->
-            queueDao.updateShuffleOrder(queueId, orders[index + 1])
-        }
+        others.forEachIndexed { index, queueId -> queueDao.updateShuffleOrder(queueId, orders[index + 1]) }
     }
 
     override suspend fun switchToSequential() {}
@@ -87,79 +87,56 @@ class PlayQueueRepo(
     override suspend fun removeByQueueId(queueId: Long) = queueDao.removeByQueueId(queueId)
 
     override suspend fun swapItems(queueId1: Long, queueId2: Long, playMode: PlayMode) {
-        if (playMode == PlayMode.SHUFFLE) {
-            val order1 = queueDao.getShuffleOrder(queueId1) ?: return
-            val order2 = queueDao.getShuffleOrder(queueId2) ?: return
-            queueDao.updateShuffleOrder(queueId1, order2)
-            queueDao.updateShuffleOrder(queueId2, order1)
-        } else {
-            val order1 = queueDao.getSortOrder(queueId1) ?: return
-            val order2 = queueDao.getSortOrder(queueId2) ?: return
-            queueDao.updateSortOrder(queueId1, order2)
-            queueDao.updateSortOrder(queueId2, order1)
-        }
+        val access = playMode.orderAccess()
+        val order1 = access.getOrder(queueId1) ?: return
+        val order2 = access.getOrder(queueId2) ?: return
+        access.updateOrder(queueId1, order2)
+        access.updateOrder(queueId2, order1)
     }
 
     override suspend fun appendToQueue(songIds: List<Long>) {
-        val maxSortOrder = queueDao.getMaxSortOrder() ?: "a0"
         val orders = FractionalIndexer.generateBetweenList(
-            before = maxSortOrder, after = null, count = songIds.size
+            before = queueDao.getMaxSortOrder() ?: "a0", after = null, count = songIds.size
         )
-        val entities = songIds.mapIndexed { index, songId ->
+        queueDao.insertAll(songIds.mapIndexed { index, songId ->
             PlayerQueueEntity(songId = songId, sortOrder = orders[index], shuffleOrder = DEFAULT_SHUFFLE_ORDER)
-        }
-        queueDao.insertAll(entities)
+        })
     }
 
     override suspend fun reassignShuffleOrdersWithSeed(anchorQueueId: Long, seed: Long) {
         assignShuffleOrders(anchorQueueId, seed)
     }
 
+    // ==================== QueueReadOps ====================
+
     override suspend fun getQueueSize(): Int = queueDao.getQueueSize()
     override suspend fun getSongIdByQueueId(queueId: Long): Long? = queueDao.getSongIdByQueueId(queueId)
     override suspend fun getQueueSongById(queueId: Long): QueueSong? = queueDao.getQueueSongById(queueId)
 
-    override suspend fun getOrder(queueId: Long, playMode: PlayMode): String? {
-        return if (playMode == PlayMode.SHUFFLE) queueDao.getShuffleOrder(queueId)
-        else queueDao.getSortOrder(queueId)
-    }
+    override suspend fun getOrder(queueId: Long, playMode: PlayMode) = playMode.orderAccess().getOrder(queueId)
 
     override suspend fun getNextQueueId(currentOrder: String, playMode: PlayMode): Long? {
-        val nextOrder = if (playMode == PlayMode.SHUFFLE) queueDao.getNextShuffleOrder(currentOrder)
-        else queueDao.getNextSortOrder(currentOrder)
-        if (nextOrder == null) return null
-        return resolveQueueIdByOrder(nextOrder, playMode)
+        return playMode.orderAccess().getNextOrder(currentOrder)?.let { playMode.orderAccess().getQueueIdByOrder(it) }
     }
 
     override suspend fun getPrevQueueId(currentOrder: String, playMode: PlayMode): Long? {
-        val prevOrder = if (playMode == PlayMode.SHUFFLE) queueDao.getPrevShuffleOrder(currentOrder)
-        else queueDao.getPrevSortOrder(currentOrder)
-        if (prevOrder == null) return null
-        return resolveQueueIdByOrder(prevOrder, playMode)
+        return playMode.orderAccess().getPrevOrder(currentOrder)?.let { playMode.orderAccess().getQueueIdByOrder(it) }
     }
 
     override suspend fun getFirstQueueId(playMode: PlayMode): Long? {
-        val order = if (playMode == PlayMode.SHUFFLE) queueDao.getMinShuffleOrder()
-        else queueDao.getMinSortOrder()
-        if (order == null) return null
-        return resolveQueueIdByOrder(order, playMode)
+        return playMode.orderAccess().getMinOrder()?.let { playMode.orderAccess().getQueueIdByOrder(it) }
     }
 
     override suspend fun getLastQueueId(playMode: PlayMode): Long? {
-        val order = if (playMode == PlayMode.SHUFFLE) queueDao.getMaxShuffleOrder()
-        else queueDao.getMaxSortOrder()
-        if (order == null) return null
-        return resolveQueueIdByOrder(order, playMode)
+        return playMode.orderAccess().getMaxOrder()?.let { playMode.orderAccess().getQueueIdByOrder(it) }
     }
 
-    override suspend fun resolveSongIds(context: PlayContext): List<Long> {
-        return when (context) {
-            is PlayContext.All -> songDao.getAllSongsSortedBy(context.sortMode).map { it.id }
-            is PlayContext.Artist -> songDao.getAllSongsByArtist(context.artist).map { it.id }
-            is PlayContext.Folder -> songDao.getAllSongsByFolder(context.path).map { it.id }
-            is PlayContext.Playlist -> playlistSongDao.getAllSongsByPlaylist(context.playlistId).map { it.id }
-            is PlayContext.Search -> searchDao.getAllSongsByKeyWords(context.keyword, context.sortMode).first().map { it.id }
-        }
+    override suspend fun resolveSongIds(context: PlayContext): List<Long> = when (context) {
+        is PlayContext.All -> songDao.getAllSongsSortedBy(context.sortMode).map { it.id }
+        is PlayContext.Artist -> songDao.getAllSongsByArtist(context.artist).map { it.id }
+        is PlayContext.Folder -> songDao.getAllSongsByFolder(context.path).map { it.id }
+        is PlayContext.Playlist -> playlistSongDao.getAllSongsByPlaylist(context.playlistId).map { it.id }
+        is PlayContext.Search -> searchDao.getAllSongsByKeyWords(context.keyword, context.sortMode).first().map { it.id }
     }
 
     override fun getPagedPlaybackQueue() = store.playMode.flatMapLatest { mode ->
@@ -175,16 +152,8 @@ class PlayQueueRepo(
         val allQueueIds = queueDao.getAllQueueIdsSorted()
         val anchorInList = anchorQueueId in allQueueIds
         val others = allQueueIds.filter { it != anchorQueueId }.shuffled(Random(seed))
-        val totalSize = if (anchorInList) allQueueIds.size else allQueueIds.size + 1
-        val orders = FractionalIndexer.generateInitialList(totalSize)
+        val orders = FractionalIndexer.generateInitialList(if (anchorInList) allQueueIds.size else allQueueIds.size + 1)
         queueDao.updateShuffleOrder(anchorQueueId, orders[0])
-        others.forEachIndexed { index, queueId ->
-            queueDao.updateShuffleOrder(queueId, orders[index + 1])
-        }
-    }
-
-    private suspend fun resolveQueueIdByOrder(order: String, playMode: PlayMode): Long? {
-        return if (playMode == PlayMode.SHUFFLE) queueDao.getQueueIdByExactShuffleOrder(order)
-        else queueDao.getQueueIdByExactSortOrder(order)
+        others.forEachIndexed { index, queueId -> queueDao.updateShuffleOrder(queueId, orders[index + 1]) }
     }
 }
