@@ -91,7 +91,7 @@ android {
             if (localPropsFile.exists()) {
                 localProps.load(localPropsFile.inputStream())
             }
-            storeFile = file(System.getenv("DORO_KEYSTORE_PATH") ?: localProps.getProperty("keystore.path"))
+            storeFile = file(System.getenv("DORO_KEYSTORE_PATH") ?: localProps.getProperty("keystore.path") ?: "doro.jks")
             storePassword = System.getenv("DORO_KEYSTORE_PASSWORD") ?: localProps.getProperty("keystore.password")
             keyAlias = System.getenv("DORO_KEY_ALIAS") ?: localProps.getProperty("keystore.alias")
             keyPassword = System.getenv("DORO_KEY_PASSWORD") ?: localProps.getProperty("keystore.alias.password")
