@@ -37,34 +37,16 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-// ═══════════ 接口定义（按消费者需求隔离） ═══════════
-
-/**
- * 播放指令分发接口
- *
- * 供各页面 ViewModel 使用，发送播放、暂停、切歌等指令。
- * 大多数页面只需要注入此接口。
- */
 interface PlayActionDispatcher {
     fun dispatch(action: PlayAction)
 }
 
-/**
- * 播放状态观察接口
- *
- * 供 PlayerViewModel 使用，观察播放状态、进度和队列。
- */
 interface PlayStateObserver {
     val uiState: StateFlow<PlayUiState>
     val currentPositionMs: StateFlow<Long>
     val playQueue: Flow<PagingData<QueueSong>>
 }
 
-/**
- * 播放器连接管理接口
- *
- * 供 MainActivityViewModel 使用，管理 MediaController 生命周期。
- */
 interface PlayerConnector {
     fun connect()
     fun disconnect()
@@ -75,21 +57,6 @@ interface PlayerAccessor {
     val isConnected: StateFlow<Boolean>
 }
 
-// ═══════════ 实现类 ═══════════
-
-/**
- * 播放会话
- *
- * 播放系统的唯一核心实例，统一管理：
- * - MediaController 连接生命周期
- * - 播放指令的接收与处理
- * - 播放状态的维护与暴露
- *
- * 采用单曲预加载模式：
- * - Room 是唯一的队列真相源，ExoPlayer 仅持有 current + preload（1-2 首）
- * - 导航由 Room 查询驱动，ExoPlayer 不承担队列管理职责
- * - 模式切换零成本：仅更新 playMode，不触碰 ExoPlayer
- */
 class PlayerSession(
     private val context: Context,
     private val queueOps: QueueWriteOps,
@@ -101,18 +68,11 @@ class PlayerSession(
     private val navigationMutex = Mutex()
     private var sessionJob: Job? = null
 
-    private companion object {
-        const val TAG = "PlayerSession"
-    }
-
-    /** 内部创建 PlaybackController，避免循环依赖 */
     private val playbackController: PlaybackController = MediaPlaybackController(this)
 
-    // ==================== PlayerAccessor：MediaController 访问 ====================
-
     private var future: ListenableFuture<MediaController>? = null
-    private var mediaController: MediaController? = null
 
+    private var mediaController: MediaController? = null
     override val controller: MediaController?
         get() = mediaController
 
@@ -121,6 +81,7 @@ class PlayerSession(
     // ==================== PlayStateObserver：状态暴露 ====================
 
     override val uiState = MutableStateFlow(PlayUiState.Empty)
+
     override val currentPositionMs = MutableStateFlow(0L)
 
     override val playQueue: Flow<PagingData<QueueSong>>
@@ -174,7 +135,8 @@ class PlayerSession(
         }
     }
 
-    private fun onDisconnected() {
+    private suspend fun onDisconnected() {
+        stateDataStore.saveCurrentPosition(currentPositionMs.value)
         sessionJob?.cancel()
         sessionJob = null
     }
@@ -372,10 +334,7 @@ class PlayerSession(
     private suspend fun handleEngineEvent(event: EngineEvent) {
         when (event) {
             is EngineEvent.OnItemTransition -> handleItemTransition(event.queueId, event.reason)
-            is EngineEvent.OnPositionUpdate -> {
-                stateDataStore.saveCurrentPosition(event.positionMs)
-                currentPositionMs.value = event.positionMs
-            }
+            is EngineEvent.OnPositionUpdate -> currentPositionMs.value = event.positionMs
             is EngineEvent.OnIsPlayingChanged -> {
                 // 播放状态由 PlayerSession 在每个操作后主动设置，
                 // 此处仅处理外部触发的状态变化（如蓝牙断开、音频焦点丢失）
@@ -409,7 +368,9 @@ class PlayerSession(
         }
         val positionMs = stateDataStore.currentPositionMs.first()
         playSongWithPreload(currentQueueId, playMode, positionMs, startPlaying = false)
+        currentPositionMs.update { positionMs }
         uiState.update { it.copy(playbackState = PlaybackState.PAUSED) }
+        syncUiState()
     }
 
     // ==================== 播放核心 ====================
@@ -478,5 +439,9 @@ class PlayerSession(
         PlayMode.REPEAT -> PlayMode.SHUFFLE
         PlayMode.SHUFFLE -> PlayMode.REPEAT_ONE
         PlayMode.REPEAT_ONE -> PlayMode.REPEAT
+    }
+
+    private companion object {
+        const val TAG = "PlayerSession"
     }
 }
