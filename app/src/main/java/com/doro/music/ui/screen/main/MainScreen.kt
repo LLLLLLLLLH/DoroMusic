@@ -30,7 +30,6 @@ import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
@@ -42,6 +41,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -59,6 +59,7 @@ import com.doro.music.R
 import com.doro.music.data.model.Artist
 import com.doro.music.data.model.Playlist
 import com.doro.music.data.model.Song
+import com.doro.music.ext.noRippleClick
 import com.doro.music.ui.component.IconAction
 import com.doro.music.ui.component.rememberAudioPermissionState
 import com.doro.music.vm.MainViewModel
@@ -310,19 +311,18 @@ private fun MainTabItem(
         label = "tabContentColor"
     )
 
-    Tab(
-        selected = selected,
-        onClick = onClick,
-        selectedContentColor = MaterialTheme.colorScheme.primary,
-        unselectedContentColor = MaterialTheme.colorScheme.onSurface,
-        text = {
-            Text(
-                text = stringResource(tab.titleRes),
-                color = contentColor,
-                style = MaterialTheme.typography.titleSmall
-            )
-        }
-    )
+    Box(
+        modifier = Modifier
+            .noRippleClick(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = stringResource(tab.titleRes),
+            color = contentColor,
+            style = MaterialTheme.typography.titleSmall
+        )
+    }
 }
 
 @Composable
