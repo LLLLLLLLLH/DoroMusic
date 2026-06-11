@@ -5,6 +5,8 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlinx.serialization)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.google.services)
+    alias(libs.plugins.firebase.crashlytics)
     jacoco
 }
 
@@ -100,13 +102,12 @@ android {
 
     buildTypes {
         debug {
-            applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
             isDebuggable = true
             isMinifyEnabled = false
-            isShrinkResources = false
         }
         release {
+            versionNameSuffix = "-release"
             isMinifyEnabled = true
             isShrinkResources = true
             isDebuggable = false
@@ -119,8 +120,10 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     //noinspection WrongGradleMethod
@@ -183,6 +186,13 @@ dependencies {
     implementation(libs.datastore.preferences)
     implementation(libs.constraintlayout.compose)
     implementation(libs.androidx.splashscreen)
+    implementation(libs.androidx.startup)
+
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.analytics)
+    implementation(libs.firebase.crashlytics)
+
+    implementation(libs.kermit)
 }
 
 // ==================== JaCoCo ====================

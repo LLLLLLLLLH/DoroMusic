@@ -25,6 +25,11 @@ media3 = "1.10.0"
 datastore = "1.2.1"
 constraintlayout = "1.1.1"
 splashscreen = "1.2.0"
+startup = "1.2.0"
+firebaseBom = "34.14.1"
+googleServices = "4.4.4"
+firebaseCrashlyticsPlugin = "3.0.7"
+kermit = "2.1.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -64,9 +69,16 @@ media3-ui-compose-material3 = { module = "androidx.media3:media3-ui-compose-mate
 datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
 constraintlayout-compose = { module = "androidx.constraintlayout:constraintlayout-compose", version.ref = "constraintlayout" }
 androidx-splashscreen = { module = "androidx.core:core-splashscreen", version.ref = "splashscreen" }
+androidx-startup = { module = "androidx.startup:startup-runtime", version.ref = "startup" }
+firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
+firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
+firebase-crashlytics = { module = "com.google.firebase:firebase-crashlytics" }
+kermit = { module = "co.touchlab:kermit", version.ref = "kermit" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlinx-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "serialization" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+google-services = { id = "com.google.gms.google-services",version.ref = "googleServices" }
+firebase-crashlytics = { id = "com.google.firebase.crashlytics",version.ref = "firebaseCrashlyticsPlugin" }
