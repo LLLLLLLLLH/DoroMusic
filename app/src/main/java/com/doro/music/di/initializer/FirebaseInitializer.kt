@@ -3,6 +3,7 @@ package com.doro.music.di.initializer
 import android.content.Context
 import androidx.startup.Initializer
 import com.google.firebase.FirebaseApp
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 
 class FirebaseInitializer : Initializer<Unit> {
 
@@ -10,5 +11,5 @@ class FirebaseInitializer : Initializer<Unit> {
         FirebaseApp.initializeApp(context)
     }
 
-    override fun dependencies(): List<Class<out Initializer<*>>> = listOf(KoinInitializer::class.java)
+    override fun dependencies(): List<Class<out Initializer<*>>> = emptyList()
 }
