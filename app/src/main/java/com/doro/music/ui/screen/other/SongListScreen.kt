@@ -107,7 +107,7 @@ private fun SongListScreen(
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.Rounded.ArrowBackIosNew,
-                            contentDescription = Icons.Rounded.ArrowBackIosNew.name
+                            contentDescription = stringResource(R.string.back)
                         )
                     }
                 },

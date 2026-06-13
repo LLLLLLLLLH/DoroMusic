@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.stringResource
 import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.ConstraintSet
 import androidx.constraintlayout.compose.Dimension
@@ -17,6 +18,7 @@ import com.doro.music.data.model.PlayMode
 import com.doro.music.data.model.PlayerAction
 import com.doro.music.data.model.PlaybackState
 import com.doro.music.data.model.Song
+import com.doro.music.R
 import com.doro.music.ui.component.SheetProgressState
 
 
@@ -104,7 +106,7 @@ fun FullPlayer(
         ) {
             Icon(
                 imageVector = Icons.Rounded.KeyboardArrowDown,
-                contentDescription = Icons.Rounded.KeyboardArrowDown.name
+                contentDescription = stringResource(R.string.collapse_player)
             )
         }
         PlayerDisplay(

@@ -26,7 +26,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.doro.music.R
 import com.doro.music.data.model.PlaybackState
 import com.doro.music.data.model.PlayerAction
 import com.doro.music.data.model.Song
@@ -63,6 +65,7 @@ fun MiniPlayer(
 
         PlayerControls(
             playbackIcon = playbackIcon,
+            playbackState = playbackState,
             onActionClick = onActionClick
         )
     }
@@ -109,13 +112,17 @@ private fun SongInfoContent(
 @Composable
 private fun PlayerControls(
     playbackIcon: ImageVector,
+    playbackState: PlaybackState,
     onActionClick: (PlayerAction) -> Unit
 ) {
+    val playPauseDescription = stringResource(
+        if (playbackState == PlaybackState.PLAYING) R.string.pause else R.string.play
+    )
     Row(verticalAlignment = Alignment.CenterVertically) {
         IconButton(onClick = { onActionClick(PlayerAction.TogglePlayPause) }) {
             Icon(
                 imageVector = playbackIcon,
-                contentDescription = null,
+                contentDescription = playPauseDescription,
                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
                 modifier = Modifier.size(28.dp)
             )
@@ -123,7 +130,7 @@ private fun PlayerControls(
         IconButton(onClick = { onActionClick(PlayerAction.Next) }) {
             Icon(
                 imageVector = Icons.Rounded.SkipNext,
-                contentDescription = null,
+                contentDescription = stringResource(R.string.next_track),
                 tint = MaterialTheme.colorScheme.onPrimaryContainer
             )
         }

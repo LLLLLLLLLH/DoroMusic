@@ -29,9 +29,11 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.doro.music.R
 import com.doro.music.data.model.LyricsData
 import com.doro.music.data.model.LyricsLine
 import kotlinx.coroutines.delay
@@ -46,7 +48,7 @@ fun LyricsView(
     if (lyrics == null) {
         Box(modifier = modifier, contentAlignment = Alignment.Center) {
             Text(
-                text = "暂无歌词",
+                text = stringResource(R.string.no_lyrics),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

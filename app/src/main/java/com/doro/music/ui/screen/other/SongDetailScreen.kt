@@ -72,7 +72,7 @@ private fun SongDetailScreen(song: Song, onBack: () -> Unit) {
                 navigationIcon = {
                     IconAction(
                         imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                        contentDescription = Icons.AutoMirrored.Rounded.ArrowBack.name,
+                        contentDescription = stringResource(R.string.back),
                         onClick = onBack
                     )
                 }

@@ -14,6 +14,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.ConstraintSet
@@ -24,6 +25,7 @@ import com.doro.music.data.model.PlayMode
 import com.doro.music.data.model.PlaybackState
 import com.doro.music.data.model.PlayerAction
 import com.doro.music.data.model.Song
+import com.doro.music.R
 import com.doro.music.ui.component.IconAction
 
 private object PlayerControlsLayoutIds {
@@ -189,31 +191,33 @@ fun PlayerControls(
         )
         IconAction(
             imageVector = playModeIcon,
-            contentDescription = playModeIcon.name,
+            contentDescription = stringResource(R.string.play_mode),
             onClick = { onActionClick(PlayerAction.TogglePlayMode) },
             modifier = Modifier.layoutId(PlayerControlsLayoutIds.PLAY_MODE_BUTTON)
         )
         IconAction(
             imageVector = Icons.Rounded.SkipPrevious,
-            contentDescription = Icons.Rounded.SkipPrevious.name,
+            contentDescription = stringResource(R.string.previous_track),
             onClick = { onActionClick(PlayerAction.Previous) },
             modifier = Modifier.layoutId(PlayerControlsLayoutIds.PREV_BUTTON)
         )
         IconAction(
             imageVector = playbackIcon,
-            contentDescription = playbackIcon.name,
+            contentDescription = stringResource(
+                if (playbackState == PlaybackState.PLAYING) R.string.pause else R.string.play
+            ),
             onClick = { onActionClick(PlayerAction.TogglePlayPause) },
             modifier = Modifier.layoutId(PlayerControlsLayoutIds.PLAY_PAUSE_BUTTON)
         )
         IconAction(
             imageVector = Icons.Rounded.SkipNext,
-            contentDescription = Icons.Rounded.SkipNext.name,
+            contentDescription = stringResource(R.string.next_track),
             onClick = { onActionClick(PlayerAction.Next) },
             modifier = Modifier.layoutId(PlayerControlsLayoutIds.NEXT_BUTTON)
         )
         IconAction(
             imageVector = Icons.AutoMirrored.Rounded.PlaylistPlay,
-            contentDescription = Icons.AutoMirrored.Rounded.PlaylistPlay.name,
+            contentDescription = stringResource(R.string.play_queue),
             onClick = { onActionClick(PlayerAction.TogglePlayQueue) },
             modifier = Modifier.layoutId(PlayerControlsLayoutIds.PLAYLIST_BUTTON)
         )

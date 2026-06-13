@@ -193,7 +193,7 @@ private fun DurationFilterDialog(
                     val labelCount = ScanSettingsDefaults.DURATION_MAX_SECONDS / ScanSettingsDefaults.DURATION_STEP_SIZE + 1
                     repeat(labelCount) { step ->
                         Text(
-                            text = "${step * ScanSettingsDefaults.DURATION_STEP_SIZE}s",
+                            text = stringResource(R.string.seconds_short, step * ScanSettingsDefaults.DURATION_STEP_SIZE),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

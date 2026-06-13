@@ -99,4 +99,15 @@
     <string name="dark_theme_dark">深色</string>
     <string name="github_url">https://github.com/DoroWolf/DoroMusic</string>
     <string name="notification_channel_playback">音乐播放</string>
+    <string name="pause">暂停</string>
+    <string name="previous_track">上一曲</string>
+    <string name="next_track">下一曲</string>
+    <string name="play_mode">播放模式</string>
+    <string name="play_queue">显示播放队列</string>
+    <string name="back">返回</string>
+    <string name="collapse_player">收起播放器</string>
+    <string name="no_lyrics">暂无歌词</string>
+    <string name="remove_from_queue">从队列中移除</string>
+    <string name="choose_browser">选择浏览器</string>
+    <string name="seconds_short">%1$d秒</string>
 </resources>

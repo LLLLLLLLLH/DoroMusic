@@ -144,7 +144,7 @@ private fun SettingsCategory(
         leadingContent = {
             Icon(
                 imageVector = icon,
-                contentDescription = null,
+                contentDescription = title,
                 tint = MaterialTheme.colorScheme.primary
             )
         },

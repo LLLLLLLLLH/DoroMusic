@@ -148,7 +148,7 @@ private fun PlayQueueItem(
         IconButton(onClick = onRemove) {
             Icon(
                 imageVector = Icons.Rounded.Close,
-                contentDescription = null,
+                contentDescription = stringResource(R.string.remove_from_queue),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp)
             )
