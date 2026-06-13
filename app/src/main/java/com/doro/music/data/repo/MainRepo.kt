@@ -12,11 +12,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.withContext
 
-/**
- * 主仓库（移除旧架构依赖）
- * 
- * 注意：扫描功能需要重新实现或移除
- */
 class MainRepo(
     private val songDao: SongDao,
     private val folderDao: FolderDao,
