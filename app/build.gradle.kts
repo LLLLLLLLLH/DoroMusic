@@ -193,6 +193,9 @@ dependencies {
     implementation(libs.firebase.crashlytics)
 
     implementation(libs.kermit)
+
+    implementation(libs.glance.appwidget)
+    implementation(libs.glance.material3)
 }
 
 // ==================== JaCoCo ====================
