@@ -110,4 +110,8 @@
     <string name="remove_from_queue">从队列中移除</string>
     <string name="choose_browser">选择浏览器</string>
     <string name="seconds_short">%1$d秒</string>
+    <string name="widget_name">音乐播放器</string>
+    <string name="widget_description">在主屏幕上控制音乐播放</string>
+    <string name="widget_no_song">未在播放</string>
+    <string name="widget_no_artist">未知艺术家</string>
 </resources>

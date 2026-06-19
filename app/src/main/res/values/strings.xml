@@ -109,4 +109,8 @@
     <string name="remove_from_queue">Remove from queue</string>
     <string name="choose_browser">Choose browser</string>
     <string name="seconds_short">%1$ds</string>
+    <string name="widget_name">Music Player</string>
+    <string name="widget_description">Control music playback from your home screen</string>
+    <string name="widget_no_song">No song playing</string>
+    <string name="widget_no_artist">Unknown artist</string>
 </resources>
