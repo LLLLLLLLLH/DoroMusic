@@ -22,6 +22,7 @@ import com.doro.music.domain.AddSongToPlaylistUseCase
 import com.doro.music.domain.GetLyricsUseCase
 import com.doro.music.domain.GetPlaylistsUseCase
 import com.doro.music.domain.GetSongFoldersUseCase
+import com.doro.music.domain.PlaybackUseCase
 import com.doro.music.domain.ScanMusicUseCase
 import com.doro.music.player.PlayActionDispatcher
 import com.doro.music.player.PlayStateObserver
@@ -119,6 +120,7 @@ val useCaseModule = module {
     factory { GetSongFoldersUseCase(get()) }
     factory { ScanMusicUseCase(get()) }
     factory { GetLyricsUseCase(get()) }
+    factory { PlaybackUseCase(get()) }
 }
 
 val viewModelModule = module {

@@ -12,8 +12,7 @@ import com.doro.music.data.model.UiEvent
 import com.doro.music.data.repo.SearchRepo
 import com.doro.music.domain.AddSongToPlaylistUseCase
 import com.doro.music.domain.GetPlaylistsUseCase
-import com.doro.music.player.model.PlayAction
-import com.doro.music.player.PlayActionDispatcher
+import com.doro.music.domain.PlaybackUseCase
 import com.doro.music.player.model.PlayContext
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,7 +26,7 @@ import kotlinx.coroutines.launch
 
 class SearchViewModel(
     private val repo: SearchRepo,
-    private val actionDispatcher: PlayActionDispatcher,
+    private val playbackUseCase: PlaybackUseCase,
     private val getPlaylistsUseCase: GetPlaylistsUseCase,
     private val addSongToPlaylistUseCase: AddSongToPlaylistUseCase
 ) : BaseViewModel() {
@@ -54,7 +53,7 @@ class SearchViewModel(
         val kw = keyword.value
         val sort = sortMode.value
         val context = PlayContext.Search(kw, sort)
-        actionDispatcher.dispatch(PlayAction.Play(targetSong.id, context))
+        playbackUseCase.play(targetSong, context)
     }
 
     fun playAll() {
@@ -62,9 +61,8 @@ class SearchViewModel(
             val kw = keyword.value
             val sort = sortMode.value
             val allSongs = repo.getAllSongsByKeyWords(kw, sort).first()
-            val firstSong = allSongs.firstOrNull() ?: return@launch
             val context = PlayContext.Search(kw, sort)
-            actionDispatcher.dispatch(PlayAction.Play(firstSong.id, context))
+            playbackUseCase.playFirst(allSongs, context)
         }
     }
 
@@ -73,14 +71,13 @@ class SearchViewModel(
             val kw = keyword.value
             val sort = sortMode.value
             val allSongs = repo.getAllSongsByKeyWords(kw, sort).first()
-            val randomSong = allSongs.randomOrNull() ?: return@launch
             val context = PlayContext.Search(kw, sort)
-            actionDispatcher.dispatch(PlayAction.Play(randomSong.id, context))
+            playbackUseCase.shufflePlay(allSongs, context)
         }
     }
 
     fun addToNext(song: Song) {
-        actionDispatcher.dispatch(PlayAction.InsertSingle(song.id))
+        playbackUseCase.addToNext(song)
     }
 
     fun addSongToPlaylist(playlists: Set<Playlist>) {

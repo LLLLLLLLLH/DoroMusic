@@ -6,8 +6,7 @@ import com.doro.music.data.model.Song
 import com.doro.music.data.repo.FolderRepo
 import com.doro.music.domain.AddSongToPlaylistUseCase
 import com.doro.music.domain.GetPlaylistsUseCase
-import com.doro.music.player.PlayActionDispatcher
-import com.doro.music.player.model.PlayAction
+import com.doro.music.domain.PlaybackUseCase
 import com.doro.music.player.model.PlayContext
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -33,7 +32,7 @@ class FoldersViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
     private val mockRepo = mockk<FolderRepo>()
-    private val mockActionDispatcher = mockk<PlayActionDispatcher>(relaxed = true)
+    private val mockPlaybackUseCase = mockk<PlaybackUseCase>(relaxed = true)
     private val mockGetPlaylistsUseCase = mockk<GetPlaylistsUseCase>()
     private val mockAddSongToPlaylistUseCase = mockk<AddSongToPlaylistUseCase>()
 
@@ -45,7 +44,7 @@ class FoldersViewModelTest {
         every { mockRepo.folders } returns flowOf(emptyList())
         coEvery { mockRepo.getSongsByFolder(any()) } returns flowOf(PagingData.empty())
         coEvery { mockGetPlaylistsUseCase() } returns flowOf(PagingData.empty())
-        viewModel = FoldersViewModel(mockRepo, mockActionDispatcher, mockGetPlaylistsUseCase, mockAddSongToPlaylistUseCase)
+        viewModel = FoldersViewModel(mockRepo, mockPlaybackUseCase, mockGetPlaylistsUseCase, mockAddSongToPlaylistUseCase)
     }
 
     @After
@@ -87,11 +86,7 @@ class FoldersViewModelTest {
         viewModel.addToNext(song)
         advanceUntilIdle()
 
-        verify {
-            mockActionDispatcher.dispatch(match { action ->
-                action is PlayAction.InsertSingle && action.songId == 50L
-            })
-        }
+        verify { mockPlaybackUseCase.addToNext(song) }
     }
 
     @Test
@@ -100,13 +95,7 @@ class FoldersViewModelTest {
         viewModel.playFolderSongs("/music/rock", song)
         advanceUntilIdle()
 
-        verify {
-            mockActionDispatcher.dispatch(match { action ->
-                action is PlayAction.Play &&
-                        action.songId == 10L &&
-                        action.playContext is PlayContext.Folder
-            })
-        }
+        verify { mockPlaybackUseCase.play(song, match { it is PlayContext.Folder }) }
     }
 
     @Test
@@ -146,11 +135,10 @@ class FoldersViewModelTest {
         viewModel.playFolderSongs("/music/rock", song)
 
         verify {
-            mockActionDispatcher.dispatch(match { action ->
-                action is PlayAction.Play &&
-                        action.playContext is PlayContext.Folder &&
-                        action.playContext.path == "/music/rock"
-            })
+            mockPlaybackUseCase.play(
+                song,
+                match { it is PlayContext.Folder && it.path == "/music/rock" }
+            )
         }
     }
 }

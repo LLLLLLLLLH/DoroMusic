@@ -3,8 +3,7 @@ package com.doro.music.vm
 import androidx.paging.PagingData
 import com.doro.music.data.model.SortMode
 import com.doro.music.data.repo.ArtistRepo
-import com.doro.music.player.PlayActionDispatcher
-import com.doro.music.player.model.PlayAction
+import com.doro.music.domain.PlaybackUseCase
 import com.doro.music.player.model.PlayContext
 import io.mockk.coEvery
 import io.mockk.mockk
@@ -27,7 +26,7 @@ class ArtistsViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
     private val mockRepo = mockk<ArtistRepo>()
-    private val mockDispatcher = mockk<PlayActionDispatcher>(relaxed = true)
+    private val mockPlaybackUseCase = mockk<PlaybackUseCase>(relaxed = true)
 
     private lateinit var viewModel: ArtistsViewModel
 
@@ -36,7 +35,7 @@ class ArtistsViewModelTest {
         Dispatchers.setMain(testDispatcher)
         coEvery { mockRepo.getArtists() } returns flowOf(PagingData.empty())
         coEvery { mockRepo.getArtistCount() } returns flowOf(0)
-        viewModel = ArtistsViewModel(mockRepo, mockDispatcher)
+        viewModel = ArtistsViewModel(mockRepo, mockPlaybackUseCase)
     }
 
     @After
@@ -60,11 +59,7 @@ class ArtistsViewModelTest {
         viewModel.addArtistToNext("TestArtist")
         advanceUntilIdle()
 
-        verify {
-            mockDispatcher.dispatch(match { action ->
-                action is PlayAction.InsertGroup && action.playContext is PlayContext.Artist
-            })
-        }
+        verify { mockPlaybackUseCase.addGroupToNext(match { it is PlayContext.Artist }) }
     }
 
     @Test

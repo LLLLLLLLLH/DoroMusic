@@ -13,9 +13,8 @@ import com.doro.music.data.model.activeFolders
 import com.doro.music.data.repo.FolderRepo
 import com.doro.music.domain.AddSongToPlaylistUseCase
 import com.doro.music.domain.GetPlaylistsUseCase
-import com.doro.music.player.model.PlayAction
+import com.doro.music.domain.PlaybackUseCase
 import com.doro.music.player.model.PlayContext
-import com.doro.music.player.PlayActionDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -28,7 +27,7 @@ import kotlinx.coroutines.launch
 
 class FoldersViewModel(
     private val repo: FolderRepo,
-    private val actionDispatcher: PlayActionDispatcher,
+    private val playbackUseCase: PlaybackUseCase,
     private val getPlaylistsUseCase: GetPlaylistsUseCase,
     private val addSongToPlaylistUseCase: AddSongToPlaylistUseCase
 ) : BaseViewModel() {
@@ -46,13 +45,13 @@ class FoldersViewModel(
     val playlist = getPlaylistsUseCase().cachedIn(viewModelScope)
 
     val selectedSongId: StateFlow<Long?>
-     field = MutableStateFlow<Long?>(null)
+        field = MutableStateFlow<Long?>(null)
 
     fun selectFolder(path: String?) { selectedFolder.tryEmit(path) }
     fun selectSong(id: Long?) { selectedSongId.tryEmit(id) }
 
     fun addToNext(song: Song) {
-        actionDispatcher.dispatch(PlayAction.InsertSingle(song.id))
+        playbackUseCase.addToNext(song)
     }
 
     fun addSongToPlaylist(playlists: Set<Playlist>) {
@@ -65,6 +64,6 @@ class FoldersViewModel(
 
     fun playFolderSongs(folderPath: String, song: Song) {
         val context = PlayContext.Folder(folderPath, com.doro.music.data.model.SortMode.TITLE)
-        actionDispatcher.dispatch(PlayAction.Play(song.id, context))
+        playbackUseCase.play(song, context)
     }
 }

@@ -8,8 +8,7 @@ import com.doro.music.data.model.SortMode
 import com.doro.music.data.repo.SearchRepo
 import com.doro.music.domain.AddSongToPlaylistUseCase
 import com.doro.music.domain.GetPlaylistsUseCase
-import com.doro.music.player.PlayActionDispatcher
-import com.doro.music.player.model.PlayAction
+import com.doro.music.domain.PlaybackUseCase
 import com.doro.music.player.model.PlayContext
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -34,7 +33,7 @@ class SearchViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
     private val mockRepo = mockk<SearchRepo>()
-    private val mockDispatcher = mockk<PlayActionDispatcher>(relaxed = true)
+    private val mockPlaybackUseCase = mockk<PlaybackUseCase>(relaxed = true)
     private val mockGetPlaylistsUseCase = mockk<GetPlaylistsUseCase>()
     private val mockAddSongToPlaylistUseCase = mockk<AddSongToPlaylistUseCase>()
 
@@ -46,7 +45,7 @@ class SearchViewModelTest {
         coEvery { mockRepo.getSongsByKeyWords(any(), any()) } returns flowOf(PagingData.empty())
         coEvery { mockRepo.getSongCountByKeyWords(any()) } returns flowOf(0)
         coEvery { mockGetPlaylistsUseCase() } returns flowOf(PagingData.empty())
-        viewModel = SearchViewModel(mockRepo, mockDispatcher, mockGetPlaylistsUseCase, mockAddSongToPlaylistUseCase)
+        viewModel = SearchViewModel(mockRepo, mockPlaybackUseCase, mockGetPlaylistsUseCase, mockAddSongToPlaylistUseCase)
     }
 
     @After
@@ -71,17 +70,13 @@ class SearchViewModelTest {
         val song = Song(id = 50L, title = "Test", path = "/test")
         viewModel.addToNext(song)
 
-        verify {
-            mockDispatcher.dispatch(match { action ->
-                action is PlayAction.InsertSingle && action.songId == 50L
-            })
-        }
+        verify { mockPlaybackUseCase.addToNext(song) }
     }
 
     @Test
     fun `play with null song does not dispatch action`() = runTest {
         viewModel.play(null)
-        verify(exactly = 0) { mockDispatcher.dispatch(any()) }
+        verify(exactly = 0) { mockPlaybackUseCase.play(any(), any()) }
     }
 
     @Test
@@ -97,11 +92,7 @@ class SearchViewModelTest {
 
         viewModel.play(song)
 
-        verify {
-            mockDispatcher.dispatch(match { action ->
-                action is PlayAction.Play && action.songId == 10L && action.playContext is PlayContext.Search
-            })
-        }
+        verify { mockPlaybackUseCase.play(song, match { it is PlayContext.Search }) }
     }
 
     @Test
@@ -116,11 +107,7 @@ class SearchViewModelTest {
         viewModel.playAll()
         advanceUntilIdle()
 
-        verify {
-            mockDispatcher.dispatch(match { action ->
-                action is PlayAction.Play && action.songId == 1L
-            })
-        }
+        verify { mockPlaybackUseCase.playFirst(songs, match { it is PlayContext.Search }) }
     }
 
     @Test
@@ -131,7 +118,7 @@ class SearchViewModelTest {
         viewModel.playAll()
         advanceUntilIdle()
 
-        verify(exactly = 0) { mockDispatcher.dispatch(any()) }
+        verify { mockPlaybackUseCase.playFirst(emptyList(), match { it is PlayContext.Search }) }
     }
 
     @Test
@@ -143,11 +130,7 @@ class SearchViewModelTest {
         viewModel.shufflePlay()
         advanceUntilIdle()
 
-        verify {
-            mockDispatcher.dispatch(match { action ->
-                action is PlayAction.Play && action.playContext is PlayContext.Search
-            })
-        }
+        verify { mockPlaybackUseCase.shufflePlay(songs, match { it is PlayContext.Search }) }
     }
 
     @Test
@@ -158,7 +141,7 @@ class SearchViewModelTest {
         viewModel.shufflePlay()
         advanceUntilIdle()
 
-        verify(exactly = 0) { mockDispatcher.dispatch(any()) }
+        verify { mockPlaybackUseCase.shufflePlay(emptyList(), match { it is PlayContext.Search }) }
     }
 
     @Test

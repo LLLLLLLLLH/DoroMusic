@@ -12,9 +12,8 @@ import com.doro.music.data.model.UiEvent
 import com.doro.music.data.repo.SongRepo
 import com.doro.music.domain.AddSongToPlaylistUseCase
 import com.doro.music.domain.GetPlaylistsUseCase
-import com.doro.music.player.model.PlayAction
+import com.doro.music.domain.PlaybackUseCase
 import com.doro.music.player.model.PlayContext
-import com.doro.music.player.PlayActionDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -25,7 +24,7 @@ import kotlinx.coroutines.launch
 
 class SongsViewModel(
     private val repo: SongRepo,
-    private val dispatcher: PlayActionDispatcher,
+    private val playbackUseCase: PlaybackUseCase,
     private val getPlaylistsUseCase: GetPlaylistsUseCase,
     private val addSongToPlaylistUseCase: AddSongToPlaylistUseCase
 ) : BaseViewModel() {
@@ -33,7 +32,7 @@ class SongsViewModel(
     val playlist = getPlaylistsUseCase().cachedIn(viewModelScope)
 
     val selectedSongId: StateFlow<Long?>
-        field =  MutableStateFlow<Long?>(null)
+        field = MutableStateFlow<Long?>(null)
 
     val songs = sortMode.flatMapLatest(repo::getSongs).cachedIn(viewModelScope)
     val songCount = repo.getSongCount().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), 0)
@@ -52,30 +51,28 @@ class SongsViewModel(
     }
 
     fun addToNext(song: Song) {
-        viewModelScope.launch { dispatcher.dispatch(PlayAction.InsertSingle(song.id)) }
+        playbackUseCase.addToNext(song)
     }
 
     fun play(song: Song? = null) {
-        val targetSongId = song?.id ?: return
+        val targetSong = song ?: return
         val context = PlayContext.All(sortMode.value)
-        dispatcher.dispatch(PlayAction.Play(targetSongId, context))
+        playbackUseCase.play(targetSong, context)
     }
 
     fun playAll() {
         viewModelScope.launch {
             val allSongs = repo.getAllSongs(sortMode.value)
-            val firstSong = allSongs.firstOrNull() ?: return@launch
             val context = PlayContext.All(sortMode.value)
-            dispatcher.dispatch(PlayAction.Play(firstSong.id, context))
+            playbackUseCase.playFirst(allSongs, context)
         }
     }
 
     fun shufflePlay() {
         viewModelScope.launch {
             val allSongs = repo.getAllSongs(sortMode.value)
-            val randomSong = allSongs.randomOrNull() ?: return@launch
             val context = PlayContext.All(sortMode.value)
-            dispatcher.dispatch(PlayAction.Play(randomSong.id, context))
+            playbackUseCase.shufflePlay(allSongs, context)
         }
     }
 }
